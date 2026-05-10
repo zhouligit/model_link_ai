@@ -1,0 +1,46 @@
+# 复制为 configs/config.yaml 并按环境修改；密钥勿提交仓库。
+# Copy to configs/config.yaml — do not commit secrets.
+
+server:
+  # 进程监听（容器/本机均适用；共用服务器时宿主机对外端口见部署文档，从 8100 起分配）
+  gateway_listen: ":8080"     # 由 Nginx 反代；对外示例（compose 默认）http://<host>:8100/mlk/v1
+  platform_listen: ":8081"
+  public_gateway_base: "http://127.0.0.1:8100/mlk/v1"   # 与宿主机 HTTP_PORT 一致时给控制台/文档用
+
+database:
+  dsn: "modlink:modlink@tcp(127.0.0.1:3306)/modlink_cloud?parseTime=true&loc=Local"
+
+redis:
+  addr: ""           # 空字符串表示不使用 Redis（限流降级为进程内粗粒度或禁用）
+  password: ""
+  db: 0
+
+jwt:
+  secret: "change-me-in-production-use-long-random"
+  issuer: "modlink-platform"
+  access_ttl_minutes: 60
+  refresh_ttl_days: 30
+
+# 上游推理：mock 返回固定 JSON；openrouter 走 HTTPS 转发（渠道密钥优先 DB，否则用下方占位）
+upstream:
+  mode: mock              # mock | openrouter
+  timeout_seconds: 120
+  openrouter_base_url: "https://openrouter.ai/api/v1"
+  # 当数据库 channels 表无可用密钥时，回退使用该环境变量（生产请只用 DB 或密钥托管）
+  openrouter_api_key: ""
+
+# 支付：mock 直接标记订单成功并入账；真实渠道后续接 SDK
+payment:
+  mode: mock              # mock | wechat | alipay
+
+# 短信：mock 永远成功
+sms:
+  mode: mock              # mock | aliyun | tencent （未实现具体厂商时保持 mock）
+
+# 注册后若邮箱在此列表，赋予 admin 角色（便于首次部署）
+security:
+  bootstrap_admin_emails:
+    - "admin@example.com"
+
+embeddings:
+  enabled: true

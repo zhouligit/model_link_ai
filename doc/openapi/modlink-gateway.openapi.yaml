@@ -1,0 +1,218 @@
+openapi: 3.1.0
+info:
+  title: ModLinkCloud Inference Gateway
+  version: "1.4.0"
+  description: |
+    与 OpenAI / OpenRouter 兼容的推理网关。详细语义见 `doc/模链云-API接口文档.md` §3。
+
+    - **命名空间**：与其它系统 **共机部署** 时使用前缀 **`/mlk`**。
+    - **Base**：`https://api.{domain}/mlk/v1`（SDK `baseURL` 指向该前缀；paths 以 `/mlk/v1/...` 形式列出）
+    - **鉴权**：`Authorization: Bearer <mk_live_* 或 mk_test_*>`
+    - **流式**：`POST /mlk/v1/chat/completions` 且 `stream: true` 时响应为 `text/event-stream`
+
+servers:
+  - url: https://api.{domain}
+    description: 生产环境（将 {domain} 换为实际备案域名）
+
+security:
+  - bearerApiKey: []
+
+tags:
+  - name: chat
+  - name: models
+  - name: embeddings
+
+paths:
+  /mlk/v1/chat/completions:
+    post:
+      tags: [chat]
+      operationId: createChatCompletion
+      summary: 创建聊天补全（支持流式 SSE）
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatCompletionRequest"
+      responses:
+        "200":
+          description: 成功；非流式为 application/json，流式为 text/event-stream
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatCompletion"
+            text/event-stream:
+              schema:
+                type: string
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "402":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+
+  /mlk/v1/models:
+    get:
+      tags: [models]
+      operationId: listModels
+      summary: 列出当前 Key 可用模型
+      responses:
+        "200":
+          description: OpenAI 兼容 model list
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Error"
+
+  /mlk/v1/models/{model_id}:
+    get:
+      tags: [models]
+      operationId: retrieveModel
+      summary: 获取单个模型信息
+      parameters:
+        - name: model_id
+          in: path
+          required: true
+          description: URL 编码后的模型 ID（可含 `/`）
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Model object
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+
+  /mlk/v1/embeddings:
+    post:
+      tags: [embeddings]
+      operationId: createEmbedding
+      summary: 文本嵌入（可通过 CFG 关闭并返回 503）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [model, input]
+              properties:
+                model:
+                  type: string
+                input:
+                  oneOf:
+                    - type: string
+                    - type: array
+                      items:
+                        type: string
+                encoding_format:
+                  type: string
+                  enum: [float, base64]
+      responses:
+        "200":
+          description: Embeddings 响应
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+
+components:
+  securitySchemes:
+    bearerApiKey:
+      type: http
+      scheme: bearer
+      description: 平台颁发的 API Key（前缀 mk_live_ 或 mk_test_）
+
+  responses:
+    Error:
+      description: 网关错误（OpenAI 兼容结构 + request_id）
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  schemas:
+    ChatCompletionRequest:
+      type: object
+      required: [model, messages]
+      properties:
+        model:
+          type: string
+          example: openai/gpt-4o
+        messages:
+          type: array
+          items:
+            type: object
+        stream:
+          type: boolean
+          default: false
+        temperature:
+          type: number
+        max_tokens:
+          type: integer
+        top_p:
+          type: number
+        frequency_penalty:
+          type: number
+        presence_penalty:
+          type: number
+        stop:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: string
+        tools:
+          type: array
+          items:
+            type: object
+        tool_choice:
+          oneOf:
+            - type: string
+            - type: object
+        response_format:
+          type: object
+        user:
+          type: string
+      additionalProperties: true
+
+    ChatCompletion:
+      type: object
+      description: OpenAI chat completion 响应（含 choices、usage 等）
+      additionalProperties: true
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            message:
+              type: string
+            type:
+              type: string
+            code:
+              type: string
+        request_id:
+          type: string

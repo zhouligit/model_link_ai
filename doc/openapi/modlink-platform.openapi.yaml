@@ -1,0 +1,1683 @@
+openapi: 3.1.0
+info:
+  title: ModLinkCloud Platform API
+  version: "1.4.0"
+  description: |
+    控制台与管理后台使用的业务 API。与人读文档：`doc/模链云-API接口文档.md`。
+
+    - **命名空间**：统一前缀 **`/mlk`**（共机部署时便于 `location /mlk/` 分流）。
+    - **Base**：`https://api.{domain}/mlk/platform/v1`
+    - **鉴权**：`Authorization: Bearer <JWT>`；租户上下文可选 **`X-Org-Id`**（优先于 JWT 默认 org）
+    - **响应包裹**：`{ code, message, data, request_id }`（`code=0` 成功）
+
+servers:
+  - url: https://api.{domain}
+    description: 生产（将 {domain} 换为实际备案域名）
+
+security:
+  - bearerJwt: []
+
+tags:
+  - name: Health
+  - name: Auth
+  - name: Users
+  - name: Orgs
+  - name: ApiKeys
+  - name: Wallet
+  - name: Orders
+  - name: PaymentNotify
+  - name: Usage
+  - name: Meta
+  - name: InferenceLogs
+  - name: Webhooks
+  - name: AdminUsers
+  - name: AdminChannels
+  - name: AdminModels
+  - name: AdminPricing
+  - name: AdminOrders
+  - name: AdminRisk
+  - name: AdminDashboard
+  - name: AdminConfig
+  - name: AdminLogs
+
+paths:
+  /mlk/health:
+    get:
+      tags: [Health]
+      operationId: healthLive
+      summary: 存活探针
+      security: []
+      responses:
+        "200":
+          description: OK
+
+  /mlk/ready:
+    get:
+      tags: [Health]
+      operationId: healthReady
+      summary: 就绪探针（可选）
+      security: []
+      responses:
+        "200":
+          description: Ready
+
+  /mlk/platform/v1/health:
+    get:
+      tags: [Health]
+      operationId: healthDependencies
+      summary: DB/Redis 等依赖探测
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/auth/register:
+    post:
+      tags: [Auth]
+      operationId: authRegister
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "200":
+          description: 注册成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelopeToken"
+
+  /mlk/platform/v1/auth/login:
+    post:
+      tags: [Auth]
+      operationId: authLogin
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelopeToken"
+
+  /mlk/platform/v1/auth/refresh:
+    post:
+      tags: [Auth]
+      operationId: authRefresh
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token:
+                  type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelopeToken"
+
+  /mlk/platform/v1/auth/logout:
+    post:
+      tags: [Auth]
+      operationId: authLogout
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/auth/password/reset-request:
+    post:
+      tags: [Auth]
+      operationId: authPasswordResetRequest
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                phone:
+                  type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/auth/password/reset-confirm:
+    post:
+      tags: [Auth]
+      operationId: authPasswordResetConfirm
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/auth/me:
+    get:
+      tags: [Auth]
+      operationId: authMe
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/users/me:
+    get:
+      tags: [Users]
+      operationId: usersMeGet
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+    patch:
+      tags: [Users]
+      operationId: usersMePatch
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                display_name:
+                  type: string
+                avatar_url:
+                  type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/orgs:
+    get:
+      tags: [Orgs]
+      operationId: orgsList
+      parameters:
+        - $ref: "#/components/parameters/XOrgId"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelopePaged"
+    post:
+      tags: [Orgs]
+      operationId: orgsCreate
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                slug:
+                  type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/orgs/{org_id}/switch:
+    post:
+      tags: [Orgs]
+      operationId: orgsSwitch
+      parameters:
+        - name: org_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/orgs/{org_id}:
+    get:
+      tags: [Orgs]
+      operationId: orgsGet
+      parameters:
+        - $ref: "#/components/parameters/OrgId"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+    patch:
+      tags: [Orgs]
+      operationId: orgsPatch
+      parameters:
+        - $ref: "#/components/parameters/OrgId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/orgs/{org_id}/members:
+    get:
+      tags: [Orgs]
+      operationId: orgsMembersList
+      parameters:
+        - $ref: "#/components/parameters/OrgId"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelopePaged"
+
+  /mlk/platform/v1/orgs/{org_id}/invitations:
+    post:
+      tags: [Orgs]
+      operationId: orgsInvitationsCreate
+      parameters:
+        - $ref: "#/components/parameters/OrgId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                phone:
+                  type: string
+                role:
+                  type: string
+                  enum: [admin, member]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/orgs/invitations/{token}/accept:
+    post:
+      tags: [Orgs]
+      operationId: orgsInvitationsAccept
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/orgs/{org_id}/members/{user_id}:
+    patch:
+      tags: [Orgs]
+      operationId: orgsMembersPatch
+      parameters:
+        - $ref: "#/components/parameters/OrgId"
+        - $ref: "#/components/parameters/UserId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+    delete:
+      tags: [Orgs]
+      operationId: orgsMembersDelete
+      parameters:
+        - $ref: "#/components/parameters/OrgId"
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/orgs/{org_id}/transfer-owner:
+    post:
+      tags: [Orgs]
+      operationId: orgsTransferOwner
+      parameters:
+        - $ref: "#/components/parameters/OrgId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [new_owner_user_id]
+              properties:
+                new_owner_user_id:
+                  type: string
+                second_factor:
+                  type: string
+                  description: 二次验证 payload（高危）
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/api-keys:
+    get:
+      tags: [ApiKeys]
+      operationId: apiKeysList
+      parameters:
+        - $ref: "#/components/parameters/XOrgId"
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+        - name: org_id
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelopePaged"
+    post:
+      tags: [ApiKeys]
+      operationId: apiKeysCreate
+      parameters:
+        - $ref: "#/components/parameters/XOrgId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, scope]
+              properties:
+                name:
+                  type: string
+                scope:
+                  type: string
+                  enum: [personal, org]
+                org_id:
+                  type: string
+                expires_at:
+                  type: string
+                  format: date-time
+                ip_allowlist:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: data 中含一次性 secret
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/api-keys/{key_id}:
+    patch:
+      tags: [ApiKeys]
+      operationId: apiKeysPatch
+      parameters:
+        - $ref: "#/components/parameters/KeyId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+    delete:
+      tags: [ApiKeys]
+      operationId: apiKeysDelete
+      parameters:
+        - $ref: "#/components/parameters/KeyId"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/api-keys/{key_id}/disable:
+    post:
+      tags: [ApiKeys]
+      operationId: apiKeysDisable
+      parameters:
+        - $ref: "#/components/parameters/KeyId"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/api-keys/{key_id}/enable:
+    post:
+      tags: [ApiKeys]
+      operationId: apiKeysEnable
+      parameters:
+        - $ref: "#/components/parameters/KeyId"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/wallet:
+    get:
+      tags: [Wallet]
+      operationId: walletGet
+      parameters:
+        - $ref: "#/components/parameters/XOrgId"
+        - name: org_id
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/wallet/transactions:
+    get:
+      tags: [Wallet]
+      operationId: walletTransactions
+      parameters:
+        - $ref: "#/components/parameters/XOrgId"
+        - name: org_id
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelopePaged"
+
+  /mlk/platform/v1/orders/recharge:
+    post:
+      tags: [Orders]
+      operationId: ordersRechargeCreate
+      parameters:
+        - $ref: "#/components/parameters/XOrgId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount_cents, channel]
+              properties:
+                amount_cents:
+                  type: integer
+                channel:
+                  type: string
+                  enum: [wechat, alipay]
+                org_id:
+                  type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/orders:
+    get:
+      tags: [Orders]
+      operationId: ordersList
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelopePaged"
+
+  /mlk/platform/v1/orders/{order_id}:
+    get:
+      tags: [Orders]
+      operationId: ordersGet
+      parameters:
+        - name: order_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/payment/notify/wechat:
+    post:
+      tags: [PaymentNotify]
+      operationId: paymentNotifyWechat
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+          application/xml:
+            schema:
+              type: string
+      responses:
+        "200":
+          description: 按微信要求返回
+
+  /mlk/platform/v1/payment/notify/alipay:
+    post:
+      tags: [PaymentNotify]
+      operationId: paymentNotifyAlipay
+      security: []
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: 按支付宝要求返回
+
+  /mlk/platform/v1/usage/summary:
+    get:
+      tags: [Usage]
+      operationId: usageSummary
+      parameters:
+        - $ref: "#/components/parameters/XOrgId"
+        - name: org_id
+          in: query
+          schema:
+            type: string
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: granularity
+          in: query
+          schema:
+            type: string
+            enum: [hour, day]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/bills:
+    get:
+      tags: [Usage]
+      operationId: billsList
+      parameters:
+        - $ref: "#/components/parameters/XOrgId"
+        - name: org_id
+          in: query
+          schema:
+            type: string
+        - name: from
+          in: query
+          schema:
+            type: string
+        - name: to
+          in: query
+          schema:
+            type: string
+        - name: model
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelopePaged"
+
+  /mlk/platform/v1/openapi/info:
+    get:
+      tags: [Meta]
+      operationId: openapiInfo
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/openapi.json:
+    get:
+      tags: [Meta]
+      operationId: openapiBundleGet
+      summary: 可选：聚合 OpenAPI JSON
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /mlk/platform/v1/inference-logs:
+    get:
+      tags: [InferenceLogs]
+      operationId: inferenceLogsTenant
+      parameters:
+        - $ref: "#/components/parameters/XOrgId"
+        - name: include_debug
+          in: query
+          schema:
+            type: integer
+            enum: [0, 1]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelopePaged"
+
+  /mlk/platform/v1/orgs/{org_id}/webhooks:
+    get:
+      tags: [Webhooks]
+      operationId: webhooksGet
+      parameters:
+        - $ref: "#/components/parameters/OrgId"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+    put:
+      tags: [Webhooks]
+      operationId: webhooksPut
+      parameters:
+        - $ref: "#/components/parameters/OrgId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/admin/users:
+    get:
+      tags: [AdminUsers]
+      operationId: adminUsersList
+      parameters:
+        - name: keyword
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelopePaged"
+
+  /mlk/platform/v1/admin/users/{user_id}:
+    get:
+      tags: [AdminUsers]
+      operationId: adminUsersGet
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/admin/users/{user_id}/disable:
+    post:
+      tags: [AdminUsers]
+      operationId: adminUsersDisable
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/admin/users/{user_id}/enable:
+    post:
+      tags: [AdminUsers]
+      operationId: adminUsersEnable
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/admin/orgs:
+    get:
+      tags: [AdminUsers]
+      operationId: adminOrgsList
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelopePaged"
+
+  /mlk/platform/v1/admin/orgs/{org_id}:
+    get:
+      tags: [AdminUsers]
+      operationId: adminOrgsGet
+      parameters:
+        - $ref: "#/components/parameters/OrgId"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/admin/orgs/{org_id}/disable:
+    post:
+      tags: [AdminUsers]
+      operationId: adminOrgsDisable
+      parameters:
+        - $ref: "#/components/parameters/OrgId"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/admin/orgs/{org_id}/members:
+    get:
+      tags: [AdminUsers]
+      operationId: adminOrgsMembers
+      parameters:
+        - $ref: "#/components/parameters/OrgId"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelopePaged"
+
+  /mlk/platform/v1/admin/orgs/{org_id}/reset-owner:
+    post:
+      tags: [AdminUsers]
+      operationId: adminOrgsResetOwner
+      parameters:
+        - $ref: "#/components/parameters/OrgId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/admin/channels:
+    get:
+      tags: [AdminChannels]
+      operationId: adminChannelsList
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelopePaged"
+    post:
+      tags: [AdminChannels]
+      operationId: adminChannelsCreate
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/admin/channels/{channel_id}:
+    get:
+      tags: [AdminChannels]
+      operationId: adminChannelsGet
+      parameters:
+        - $ref: "#/components/parameters/ChannelId"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+    patch:
+      tags: [AdminChannels]
+      operationId: adminChannelsPatch
+      parameters:
+        - $ref: "#/components/parameters/ChannelId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/admin/channels/{channel_id}/test:
+    post:
+      tags: [AdminChannels]
+      operationId: adminChannelsTest
+      parameters:
+        - $ref: "#/components/parameters/ChannelId"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/admin/channels/{channel_id}/circuit-break:
+    post:
+      tags: [AdminChannels]
+      operationId: adminChannelsCircuitBreak
+      parameters:
+        - $ref: "#/components/parameters/ChannelId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/admin/models:
+    get:
+      tags: [AdminModels]
+      operationId: adminModelsList
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelopePaged"
+    post:
+      tags: [AdminModels]
+      operationId: adminModelsCreate
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/admin/models/{model_id}:
+    patch:
+      tags: [AdminModels]
+      operationId: adminModelsPatch
+      parameters:
+        - $ref: "#/components/parameters/ModelId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/admin/models/import:
+    post:
+      tags: [AdminModels]
+      operationId: adminModelsImport
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/admin/models/sync:
+    post:
+      tags: [AdminModels]
+      operationId: adminModelsSync
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/admin/routes:
+    get:
+      tags: [AdminModels]
+      operationId: adminRoutesList
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/admin/routes/{id}:
+    put:
+      tags: [AdminModels]
+      operationId: adminRoutesPut
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/admin/policies/model-access:
+    get:
+      tags: [AdminModels]
+      operationId: adminPoliciesModelAccessGet
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+    put:
+      tags: [AdminModels]
+      operationId: adminPoliciesModelAccessPut
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/admin/pricing/models:
+    get:
+      tags: [AdminPricing]
+      operationId: adminPricingModelsList
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/admin/pricing/models/{model_id}:
+    put:
+      tags: [AdminPricing]
+      operationId: adminPricingModelsPut
+      parameters:
+        - $ref: "#/components/parameters/ModelId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/admin/plans:
+    get:
+      tags: [AdminPricing]
+      operationId: adminPlansList
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelopePaged"
+    post:
+      tags: [AdminPricing]
+      operationId: adminPlansCreate
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/admin/plans/{plan_id}:
+    patch:
+      tags: [AdminPricing]
+      operationId: adminPlansPatch
+      parameters:
+        - name: plan_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/admin/orders:
+    get:
+      tags: [AdminOrders]
+      operationId: adminOrdersList
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelopePaged"
+
+  /mlk/platform/v1/admin/orders/{order_id}:
+    get:
+      tags: [AdminOrders]
+      operationId: adminOrdersGet
+      parameters:
+        - name: order_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/admin/orders/{order_id}/manual-complete:
+    post:
+      tags: [AdminOrders]
+      operationId: adminOrdersManualComplete
+      parameters:
+        - name: order_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/admin/adjustments:
+    post:
+      tags: [AdminOrders]
+      operationId: adminAdjustmentsCreate
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  type: string
+                org_id:
+                  type: string
+                amount_cents:
+                  type: integer
+                reason:
+                  type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/admin/reconciliation/export:
+    get:
+      tags: [AdminOrders]
+      operationId: adminReconciliationExport
+      responses:
+        "200":
+          description: CSV 文件流
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+
+  /mlk/platform/v1/admin/risk/rate-limits:
+    get:
+      tags: [AdminRisk]
+      operationId: adminRiskRateLimitsGet
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+    put:
+      tags: [AdminRisk]
+      operationId: adminRiskRateLimitsPut
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/admin/risk/quotas:
+    get:
+      tags: [AdminRisk]
+      operationId: adminRiskQuotasGet
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+    put:
+      tags: [AdminRisk]
+      operationId: adminRiskQuotasPut
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/admin/risk/blacklist:
+    get:
+      tags: [AdminRisk]
+      operationId: adminRiskBlacklistList
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelopePaged"
+    post:
+      tags: [AdminRisk]
+      operationId: adminRiskBlacklistAdd
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/admin/risk/blacklist/{entry_id}:
+    delete:
+      tags: [AdminRisk]
+      operationId: adminRiskBlacklistDelete
+      parameters:
+        - name: entry_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/admin/risk/whitelist:
+    get:
+      tags: [AdminRisk]
+      operationId: adminRiskWhitelistList
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelopePaged"
+
+  /mlk/platform/v1/admin/dashboard/summary:
+    get:
+      tags: [AdminDashboard]
+      operationId: adminDashboardSummary
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/admin/dashboard/series:
+    get:
+      tags: [AdminDashboard]
+      operationId: adminDashboardSeries
+      parameters:
+        - name: metric
+          in: query
+          schema:
+            type: string
+        - name: from
+          in: query
+          schema:
+            type: string
+        - name: to
+          in: query
+          schema:
+            type: string
+        - name: interval
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/admin/dashboard/screen:
+    get:
+      tags: [AdminDashboard]
+      operationId: adminDashboardScreen
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/admin/config:
+    get:
+      tags: [AdminConfig]
+      operationId: adminConfigGet
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+    patch:
+      tags: [AdminConfig]
+      operationId: adminConfigPatch
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelope"
+
+  /mlk/platform/v1/admin/audit-logs:
+    get:
+      tags: [AdminConfig]
+      operationId: adminAuditLogs
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelopePaged"
+
+  /mlk/platform/v1/admin/inference-logs:
+    get:
+      tags: [AdminLogs]
+      operationId: adminInferenceLogs
+      parameters:
+        - name: request_id
+          in: query
+          schema:
+            type: string
+        - name: user_id
+          in: query
+          schema:
+            type: string
+        - name: org_id
+          in: query
+          schema:
+            type: string
+        - name: model
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: from
+          in: query
+          schema:
+            type: string
+        - name: to
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiEnvelopePaged"
+
+components:
+  securitySchemes:
+    bearerJwt:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    XOrgId:
+      name: X-Org-Id
+      in: header
+      required: false
+      schema:
+        type: string
+      description: 指定当前组织（合法成员时优先于 JWT 默认 org）
+    OrgId:
+      name: org_id
+      in: path
+      required: true
+      schema:
+        type: string
+    UserId:
+      name: user_id
+      in: path
+      required: true
+      schema:
+        type: string
+    KeyId:
+      name: key_id
+      in: path
+      required: true
+      schema:
+        type: string
+    ChannelId:
+      name: channel_id
+      in: path
+      required: true
+      schema:
+        type: string
+    ModelId:
+      name: model_id
+      in: path
+      required: true
+      schema:
+        type: string
+
+  schemas:
+    ApiEnvelope:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code:
+          type: integer
+          example: 0
+        message:
+          type: string
+        data: {}
+        request_id:
+          type: string
+
+    ApiEnvelopePaged:
+      allOf:
+        - $ref: "#/components/schemas/ApiEnvelope"
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                items:
+                  type: array
+                  items: {}
+                page:
+                  type: integer
+                page_size:
+                  type: integer
+                total:
+                  type: integer
+
+    ApiEnvelopeToken:
+      allOf:
+        - $ref: "#/components/schemas/ApiEnvelope"
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                user_id:
+                  type: string
+                access_token:
+                  type: string
+                refresh_token:
+                  type: string
+                expires_in:
+                  type: integer
+
+    RegisterRequest:
+      type: object
+      properties:
+        email:
+          type: string
+        phone:
+          type: string
+        password:
+          type: string
+        invite_code:
+          type: string
+
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+        phone:
+          type: string
+        password:
+          type: string

@@ -1,0 +1,41 @@
+# Docker Compose 默认挂载路径：/app/config.yaml
+# 数据库主机名为 compose 服务名 mysql；若使用百度云 RDS，改为 RDS 内网地址并删掉 compose 里的 mysql 服务。
+
+server:
+  gateway_listen: ":8080"
+  platform_listen: ":8081"
+  # 宿主机映射 HTTP_PORT 默认 8100 → 容器 nginx:80，对外 Base URL 端口与此一致
+  public_gateway_base: "http://localhost:8100/mlk/v1"
+
+database:
+  dsn: "modlink:modlink@tcp(mysql:3306)/modlink_cloud?parseTime=true&loc=Local&charset=utf8mb4"
+
+redis:
+  addr: "redis:6379"
+  password: ""
+  db: 0
+
+jwt:
+  secret: "replace-with-long-random-in-env-or-this-file"
+  issuer: "modlink-platform"
+  access_ttl_minutes: 60
+  refresh_ttl_days: 30
+
+upstream:
+  mode: mock
+  timeout_seconds: 120
+  openrouter_base_url: "https://openrouter.ai/api/v1"
+  openrouter_api_key: ""
+
+payment:
+  mode: mock
+
+sms:
+  mode: mock
+
+security:
+  bootstrap_admin_emails:
+    - "admin@example.com"
+
+embeddings:
+  enabled: true

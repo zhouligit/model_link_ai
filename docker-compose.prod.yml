@@ -1,0 +1,113 @@
+# 生产/一体机一键：docker compose -f docker-compose.prod.yml up -d
+# 首次请先复制 deploy/docker/config.docker.yaml → deploy/docker/config.local.yaml 并修改 jwt.secret、管理员邮箱等
+#
+# 使用百度云 RDS：删掉下方 mysql 服务，改配置文件 database.dsn，并移除各服务对 mysql 的 depends_on / condition。
+#
+# 宿主机端口约定（与其它服务共用机）：默认仅映射 HTTP_PORT（默认 8100）→ 本栈 Nginx；
+# Gateway/Platform 仅在 Docker 网络内监听，不占宿主机 8080/8081，避免与友邻进程冲突。
+
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: modlink_cloud
+      MYSQL_USER: modlink
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-modlink}
+    volumes:
+      - modlink_mysql_data:/var/lib/mysql
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    # 若修改 MYSQL_ROOT_PASSWORD，请将下方 -proot 改为与实际一致，或改用 .my.cnf
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 36
+      start_period: 20s
+    networks:
+      - modlink
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - modlink_redis_data:/data
+    networks:
+      - modlink
+
+  migrate:
+    image: mysql:8.0
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_HOST: mysql
+      MYSQL_USER: root
+    volumes:
+      - ./modlink-gateway/migrations:/migrations:ro
+      - ./deploy/docker/migrate.sh:/migrate.sh:ro
+    entrypoint: ["/bin/bash", "/migrate.sh"]
+    networks:
+      - modlink
+    restart: "no"
+
+  platform:
+    build:
+      context: ./modlink-gateway
+      dockerfile: Dockerfile
+    image: modlink-gateway:${IMAGE_TAG:-local}
+    command: ["/app/platform"]
+    environment:
+      MODLINK_CONFIG: /app/config.yaml
+    volumes:
+      - ${MODLINK_CONFIG_FILE:-./deploy/docker/config.docker.yaml}:/app/config.yaml:ro
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+    networks:
+      - modlink
+    restart: unless-stopped
+
+  gateway:
+    build:
+      context: ./modlink-gateway
+      dockerfile: Dockerfile
+    image: modlink-gateway:${IMAGE_TAG:-local}
+    command: ["/app/gateway"]
+    environment:
+      MODLINK_CONFIG: /app/config.yaml
+    volumes:
+      - ${MODLINK_CONFIG_FILE:-./deploy/docker/config.docker.yaml}:/app/config.yaml:ro
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+    networks:
+      - modlink
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:1.26-alpine
+    ports:
+      - "${HTTP_PORT:-8100}:80"
+    volumes:
+      - ./deploy/nginx/modlink.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - gateway
+      - platform
+    networks:
+      - modlink
+    restart: unless-stopped
+
+networks:
+  modlink:
+
+volumes:
+  modlink_mysql_data:
+  modlink_redis_data:
