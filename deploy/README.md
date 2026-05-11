@@ -34,6 +34,8 @@ sudo cp deploy/docker/daemon.json.example /etc/docker/daemon.json
 sudo systemctl restart docker
 ```
 
+若出现 **`buildx isn't installed`**：Compose 仍可用默认 `docker build` 构建，一般可忽略；需要 Bake 时再装 **`docker-buildx-plugin`**（`apt-cache search buildx`）。
+
 **验证镜像站是否通**：
 
 ```bash
