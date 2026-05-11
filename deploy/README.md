@@ -93,7 +93,7 @@ docker logs model_link_ai-gateway-1 --tail=40
 若出现 **`database ping: ... connection refused`** 或 **`dial tcp 127.0.0.1:3306`**，请改 DSN 后重启：
 
 ```bash
-nano deploy/docker/config.local.yaml   # database.dsn 中 host 改为 mysql
+vi deploy/docker/config.local.yaml   # database.dsn 中 host 改为 mysql；Esc 后 :wq 保存退出
 docker compose -f docker-compose.prod.yml -f docker-compose.cn-mirror.yml up -d
 ```
 
@@ -107,7 +107,7 @@ docker compose -f docker-compose.prod.yml -f docker-compose.cn-mirror.yml up -d
 
 ```bash
 cp deploy/docker/config.docker.yaml deploy/docker/config.local.yaml
-# 编辑 config.local.yaml：至少修改 jwt.secret、security.bootstrap_admin_emails、upstream
+vi deploy/docker/config.local.yaml   # 至少改 jwt.secret、security.bootstrap_admin_emails、upstream；Esc 后 :wq
 
 export MODLINK_CONFIG_FILE="$PWD/deploy/docker/config.local.yaml"
 docker compose -f docker-compose.prod.yml build
