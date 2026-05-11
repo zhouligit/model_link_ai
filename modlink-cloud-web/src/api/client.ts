@@ -84,12 +84,11 @@ export async function listApiKeys() {
   return data
 }
 
-export async function createApiKey(name: string, scope: 'personal' | 'org', orgId?: number, test?: boolean) {
+export async function createApiKey(name: string, scope: 'personal' | 'org', orgId?: number) {
   const { data } = await api.post<ApiEnvelope<{ id: number; secret: string; key_prefix: string }>>('/api-keys', {
     name,
     scope,
     org_id: orgId,
-    test: !!test,
   })
   return data
 }

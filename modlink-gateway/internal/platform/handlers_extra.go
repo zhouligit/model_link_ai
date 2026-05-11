@@ -183,7 +183,6 @@ func createKey(st *store.Store) http.HandlerFunc {
 			Name  string `json:"name"`
 			Scope string `json:"scope"`
 			OrgID *uint64 `json:"org_id"`
-			Test  bool   `json:"test"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Name == "" || (body.Scope != "personal" && body.Scope != "org") {
 			envelope.Err(w, r, http.StatusBadRequest, 40001, "BAD_JSON", nil)
@@ -201,7 +200,7 @@ func createKey(st *store.Store) http.HandlerFunc {
 			}
 			orgPtr = body.OrgID
 		}
-		full, prefix, hash, err := store.GenerateAPIKey(body.Test)
+		full, prefix, hash, err := store.GenerateAPIKey()
 		if err != nil {
 			envelope.Err(w, r, http.StatusInternalServerError, 50001, "KEY_GEN_FAILED", nil)
 			return

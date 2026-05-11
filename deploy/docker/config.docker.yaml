@@ -25,7 +25,7 @@ jwt:
   refresh_ttl_days: 30
 
 upstream:
-  mode: mock
+  mode: openrouter
   timeout_seconds: 120
   openrouter_base_url: "https://openrouter.ai/api/v1"
   # 也可用环境变量 MODLINK_OPENROUTER_API_KEY；优先级见 README

@@ -7,7 +7,7 @@ info:
 
     - **命名空间**：与其它系统 **共机部署** 时使用前缀 **`/mlk`**。
     - **Base**：`https://api.{domain}/mlk/v1`（SDK `baseURL` 指向该前缀；paths 以 `/mlk/v1/...` 形式列出）
-    - **鉴权**：`Authorization: Bearer <mk_live_* 或 mk_test_*>`
+    - **鉴权**：`Authorization: Bearer <mk_live_*>`（平台控制台创建的 Key 均为 `mk_live_` 前缀）
     - **流式**：`POST /mlk/v1/chat/completions` 且 `stream: true` 时响应为 `text/event-stream`
 
 servers:
@@ -142,7 +142,7 @@ components:
     bearerApiKey:
       type: http
       scheme: bearer
-      description: 平台颁发的 API Key（前缀 mk_live_ 或 mk_test_）
+      description: 平台颁发的 API Key（前缀 mk_live_）
 
   responses:
     Error:

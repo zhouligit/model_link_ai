@@ -101,8 +101,9 @@ func (c *Config) normalize() {
 	if c.Upstream.TimeoutSeconds <= 0 {
 		c.Upstream.TimeoutSeconds = 120
 	}
+	// 推理默认走真实上游；需配置 OpenRouter 等密钥。若仍要本地假数据，在 yaml 中显式写 upstream.mode: mock
 	if strings.TrimSpace(c.Upstream.Mode) == "" {
-		c.Upstream.Mode = "mock"
+		c.Upstream.Mode = "openrouter"
 	}
 	if v := strings.TrimSpace(os.Getenv("MODLINK_OPENROUTER_API_KEY")); v != "" {
 		c.Upstream.OpenRouterAPIKey = v

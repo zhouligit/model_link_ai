@@ -2,7 +2,7 @@
 
 | 文件 | 说明 |
 |------|------|
-| [modlink-gateway.openapi.yaml](./modlink-gateway.openapi.yaml) | **推理网关**：`/mlk/v1/*`，Bearer `mk_live_` / `mk_test_` |
+| [modlink-gateway.openapi.yaml](./modlink-gateway.openapi.yaml) | **推理网关**：`/mlk/v1/*`，Bearer `mk_live_*` |
 | [modlink-platform.openapi.yaml](./modlink-platform.openapi.yaml) | **平台 API**：`/mlk/platform/v1/*`、支付回调、`/mlk/health` 等 |
 
 **与人读文档对应**：[模链云-API接口文档.md](../模链云-API接口文档.md)（**v1.4**，含 **`/mlk`** 前缀与 A–H）。

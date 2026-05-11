@@ -349,7 +349,7 @@ async function makeKey(scope: 'personal' | 'org') {
     ElMessage.warning('请先在「钱包视角」中选择组织')
     return
   }
-  const r = await createApiKey(keyName.value || 'key', scope, oid ?? undefined, false)
+  const r = await createApiKey(keyName.value || 'key', scope, oid ?? undefined)
   if (r.code !== 0 || !r.data?.secret) {
     ElMessage.error(r.message || '创建失败')
     return

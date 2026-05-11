@@ -46,7 +46,7 @@ docker compose -f docker-compose.prod.yml up -d --build
    mysql -h127.0.0.1 -uroot -proot modlink_cloud < modlink-gateway/migrations/002_seed.sql
    ```
 
-3. **配置**：复制 `modlink-gateway/configs/config.example.yaml` 为 `configs/config.yaml`，修改 `database.dsn`、`jwt.secret`、`upstream.mode`（`mock` / `openrouter`）等。
+3. **配置**：复制 `modlink-gateway/configs/config.example.yaml` 为 `configs/config.yaml`，修改 `database.dsn`、`jwt.secret` 等；推理默认 **`upstream.mode: openrouter`**，仅本地假数据时显式改为 **`mock`**。
 
 4. **依赖与编译**（若访问 proxy.golang.org 较慢，可使用国内镜像）：
 
@@ -73,7 +73,7 @@ cd modlink-cloud-admin && npm install && npm run dev
 
 ## 外部集成说明（mock / 真接）
 
-- **推理上游**：`configs/config.yaml` 中 `upstream.mode`：`mock` 返回固定 SSE/JSON；`openrouter` 转发至渠道 `base_url`。上游密钥优先级：**`MODLINK_OPENROUTER_API_KEY` 环境变量** > **`upstream.openrouter_api_key`** > 数据库 **`channels.api_key_cipher`**（管理后台 **上游渠道 → 配置密钥** 会写入该字段；`plain:base64` 存储格式）。
+- **推理上游（用户 API Key 调网关）**：默认 **`openrouter`**，请求转发至渠道 `base_url`；仅当显式配置 **`upstream.mode: mock`** 时返回固定假 SSE/JSON。**支付 / 短信仍为 mock**，与推理无关。上游密钥优先级：**`MODLINK_OPENROUTER_API_KEY`** > **`upstream.openrouter_api_key`** > **`channels.api_key_cipher`**（管理后台 **上游渠道 → 配置密钥**）。用户创建的 Key **均为 `mk_live_` 前缀**（无 `mk_test_` 分支）。
 - **支付**：`payment.mode: mock` 时，充值下单后调用 Platform **`POST /mlk/platform/v1/payment/mock/complete`**（Body：`{"order_id":"..."}`）模拟入账。
 - **短信**：接口占位；`sms.mode: mock`。
 

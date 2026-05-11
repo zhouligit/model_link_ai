@@ -28,16 +28,13 @@ func hashAPIKey(full string) string {
 	return hex.EncodeToString(h[:])
 }
 
-// GenerateAPIKey returns fullSecret (once), prefix for display, hash for storage.
-func GenerateAPIKey(testEnv bool) (full string, prefix string, hash string, err error) {
+// GenerateAPIKey returns fullSecret (once), prefix for display, hash for storage（始终 mk_live_，无测试前缀分支）。
+func GenerateAPIKey() (full string, prefix string, hash string, err error) {
 	var b [24]byte
 	if _, err = rand.Read(b[:]); err != nil {
 		return "", "", "", err
 	}
-	pref := "mk_live_"
-	if testEnv {
-		pref = "mk_test_"
-	}
+	const pref = "mk_live_"
 	suffix := hex.EncodeToString(b[:])
 	full = pref + suffix
 	prefix = pref + suffix[:8]

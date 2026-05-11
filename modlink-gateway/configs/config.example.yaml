@@ -21,9 +21,9 @@ jwt:
   access_ttl_minutes: 60
   refresh_ttl_days: 30
 
-# 上游推理：mock 返回固定 JSON；openrouter 走 HTTPS 转发（渠道密钥优先 DB，否则用下方占位）
+# 上游推理：openrouter 为真实转发；mock 仅用于无密钥本地假数据（显式配置）。支付/短信仍为 mock 见下方。
 upstream:
-  mode: mock              # mock | openrouter
+  mode: openrouter        # mock | openrouter
   timeout_seconds: 120
   openrouter_base_url: "https://openrouter.ai/api/v1"
   # 优先级：环境变量 MODLINK_OPENROUTER_API_KEY > 本字段 > 数据库 channels.api_key_cipher
