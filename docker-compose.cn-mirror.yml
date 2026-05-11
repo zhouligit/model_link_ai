@@ -1,0 +1,34 @@
+# 国内网络拉 Docker Hub 超时：与本文件一起使用，从 DaoCloud 镜像站拉取官方镜像等价物。
+#
+#   docker compose -f docker-compose.prod.yml -f docker-compose.cn-mirror.yml up -d --build
+#
+# 若某镜像站不可用，可改成本仓库 deploy/README.md 中列出的其它前缀，或改用 /etc/docker/daemon.json 的 registry-mirrors。
+
+services:
+  mysql:
+    image: docker.m.daocloud.io/library/mysql:8.0
+
+  redis:
+    image: docker.m.daocloud.io/library/redis:7-alpine
+
+  migrate:
+    image: docker.m.daocloud.io/library/mysql:8.0
+
+  nginx:
+    image: docker.m.daocloud.io/library/nginx:1.26-alpine
+
+  platform:
+    build:
+      context: ./modlink-gateway
+      dockerfile: Dockerfile
+      args:
+        BASE_GO_IMAGE: docker.m.daocloud.io/library/golang:1.22-bookworm
+        BASE_RUN_IMAGE: docker.m.daocloud.io/library/debian:bookworm-slim
+
+  gateway:
+    build:
+      context: ./modlink-gateway
+      dockerfile: Dockerfile
+      args:
+        BASE_GO_IMAGE: docker.m.daocloud.io/library/golang:1.22-bookworm
+        BASE_RUN_IMAGE: docker.m.daocloud.io/library/debian:bookworm-slim

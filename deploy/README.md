@@ -14,6 +14,36 @@
 
 **整机已有 Nginx（监听 80/443）时**：不要抢全局端口；在本机 `server {}` 里 **`include`** [`deploy/nginx/host-mlk-proxy.conf`](./nginx/host-mlk-proxy.conf)，把路径 **`^~ /mlk`** 反代到 **`http://127.0.0.1:8100`**（即上面 Docker Nginx）。其它 `location`（其它产品的前后端）互不重叠。
 
+## 国内 / 百度云：拉取 Docker Hub 超时（`registry-1.docker.io` i/o timeout）
+
+**现象**：`failed to resolve reference "docker.io/library/nginx:..."` 或 `dial tcp ...:443: i/o timeout`。
+
+**做法一（推荐，立刻可用）**：使用仓库自带的 **国内镜像前缀** 覆盖 compose：
+
+```bash
+export MODLINK_CONFIG_FILE=$PWD/deploy/docker/config.local.yaml
+docker compose -f docker-compose.prod.yml -f docker-compose.cn-mirror.yml up -d --build
+```
+
+**做法二（全机加速）**：配置 Docker 守护进程镜像加速后 **重启 Docker**，再执行原来的 `docker compose -f docker-compose.prod.yml ...`：
+
+```bash
+sudo mkdir -p /etc/docker
+sudo cp deploy/docker/daemon.json.example /etc/docker/daemon.json
+# 按需编辑 mirrors；百度云可改用控制台提供的「容器镜像服务」加速地址
+sudo systemctl restart docker
+```
+
+**验证镜像站是否通**：
+
+```bash
+docker pull docker.m.daocloud.io/library/nginx:1.26-alpine
+```
+
+若 DaoCloud 也失败，可换 **阿里云 ACR 个人版** 的 Docker Hub 代理地址（在阿里云控制台复制），写进 `daemon.json` 的 `registry-mirrors`，或把 `docker-compose.cn-mirror.yml` 里的前缀整体替换为云厂商文档给出的前缀。
+
+---
+
 ## 一键启动（自带 MySQL）
 
 在仓库根目录：

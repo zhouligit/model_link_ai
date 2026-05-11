@@ -23,6 +23,8 @@ export MODLINK_CONFIG_FILE=$PWD/deploy/docker/config.local.yaml
 docker compose -f docker-compose.prod.yml up -d --build
 ```
 
+**国内拉镜像超时**：加 `-f docker-compose.cn-mirror.yml`（见 `deploy/README.md`）。
+
 详见 **`deploy/README.md`**（含 **百度云 RDS**、HTTPS、扩副本说明）。
 
 **与其它服务共机**：对外默认 **`HTTP_PORT=8100`**（模链云独占该约定端口段起点）；整机 Nginx 可用 `deploy/nginx/host-mlk-proxy.conf` 把 **`/mlk`** 反代到 `127.0.0.1:8100`，与其它业务的 `location` 隔离。
