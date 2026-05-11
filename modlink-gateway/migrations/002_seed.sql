@@ -26,5 +26,10 @@ INSERT INTO system_config (config_key, config_value, description) VALUES
   ('min_recharge_cents', '100', '最小充值分')
 ON DUPLICATE KEY UPDATE config_value = VALUES(config_value);
 
+-- 无唯一约束时避免重复 up 插入多行：仅在没有 global 规则时插入
 INSERT INTO risk_rate_limit_rules (scope_type, scope_id, limit_qps, burst, enabled)
-VALUES ('global', NULL, 1000, 2000, 1);
+SELECT 'global', NULL, 1000, 2000, 1
+FROM (SELECT 1) AS _
+WHERE NOT EXISTS (
+  SELECT 1 FROM risk_rate_limit_rules WHERE scope_type = 'global' AND scope_id IS NULL LIMIT 1
+);

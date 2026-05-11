@@ -46,6 +46,24 @@ docker pull docker.m.daocloud.io/library/nginx:1.26-alpine
 
 ---
 
+## 故障：`migrate` 容器 `exit 1`
+
+先看日志：
+
+```bash
+docker logs model_link_ai-migrate-1 --tail=80
+```
+
+常见原因：
+
+1. **数据卷里的 MySQL 仍是旧 root 密码**，而 migrate 用的是 compose 里新的默认 **`123456`** → 认证失败。处理：在 **`.env`** 里设 **`MYSQL_ROOT_PASSWORD=` 与当前数据卷一致**（例如仍是 `root`），或 **`docker compose ... down -v` 清空卷** 后重起（**会删库**）。  
+2. **001 曾执行一半又重跑**：表已存在导致 `CREATE TABLE` 报错 → 开发环境可 **`down -v`** 重来。  
+3. **网络**：migrate 连不上 `mysql:3306`（极少见，若 `depends_on: healthy` 已满足一般不是）。
+
+仓库已加强 **`deploy/docker/migrate.sh`**（显式 `-p`、失败时打印提示），更新代码后重新 `up` 即可。
+
+---
+
 ## 故障：`platform` / `gateway` / `nginx` 一直 `Restarting`，8100 连不上
 
 **最常见原因**：`config.local.yaml` 里 **`database.dsn` 写成了 `127.0.0.1` 或宿主机 IP**。  
