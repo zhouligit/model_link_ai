@@ -69,7 +69,7 @@ cd modlink-cloud-web && npm install && npm run dev
 cd modlink-cloud-admin && npm install && npm run dev
 ```
 
-开发环境通过 Vite **proxy** 将 `/mlk` 转到本地 Platform（见各目录 `vite.config.ts`）。
+开发环境通过 Vite **proxy** 将 `/mlk` 转到后端（见各目录 `vite.config.ts`）。未配置时默认联调 **`http://106.13.108.88:8100`**；复制 `vite-proxy.env.example` 为 `.env.development` 可覆盖 `VITE_PROXY_TARGET`。
 
 ## 外部集成说明（mock / 真接）
 

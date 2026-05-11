@@ -36,7 +36,7 @@ async function onSubmit() {
     })
     if (!data || typeof data !== 'object' || typeof data.code !== 'number') {
       ElMessage.error(
-        '服务返回异常：请确认开发代理 VITE_PROXY_TARGET 指向 Platform（:8081），不要指向 Gateway（:8080）',
+        '服务返回异常：请确认 Vite 代理可达后端。默认联调 http://106.13.108.88:8100；本机只跑 Platform 时在 .env.development 写 VITE_PROXY_TARGET=http://127.0.0.1:8081',
       )
       return
     }
