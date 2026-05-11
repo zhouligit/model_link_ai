@@ -96,6 +96,12 @@ func NewRouter(cfg *config.Config, st *store.Store) http.Handler {
 		})
 
 		// --- public auth ---
+		r.Get("/auth/login", func(w http.ResponseWriter, r *http.Request) {
+			envelope.Err(w, r, http.StatusMethodNotAllowed, 40501, "METHOD_NOT_ALLOWED", map[string]any{
+				"hint": "登录必须使用 POST；Content-Type: application/json；body: {\"email\":\"...\",\"password\":\"...\"}",
+			})
+		})
+
 		r.Post("/auth/register", func(w http.ResponseWriter, r *http.Request) {
 			var body struct {
 				Email        string `json:"email"`
@@ -138,7 +144,7 @@ func NewRouter(cfg *config.Config, st *store.Store) http.Handler {
 			u := &store.User{ID: uid, Email: strings.ToLower(strings.TrimSpace(body.Email)), Role: role, Status: "active"}
 			tok, err := issueTokens(cfg, st, u, nil)
 			if err != nil {
-				envelope.Err(w, r, http.StatusInternalServerError, 50004, "TOKEN_ISSUE_FAILED", nil)
+				envelope.Err(w, r, http.StatusInternalServerError, 50004, "TOKEN_ISSUE_FAILED", map[string]any{"error": err.Error()})
 				return
 			}
 			envelope.OK(w, r, tok)
@@ -166,11 +172,12 @@ func NewRouter(cfg *config.Config, st *store.Store) http.Handler {
 			_ = st.TouchLogin(r.Context(), u.ID)
 			var curOrg *uint64
 			if orgs, err := st.ListUserOrgs(r.Context(), u.ID); err == nil && len(orgs) > 0 {
-				curOrg = &orgs[0].ID
+				oid := orgs[0].ID
+				curOrg = &oid
 			}
 			tok, err := issueTokens(cfg, st, u, curOrg)
 			if err != nil {
-				envelope.Err(w, r, http.StatusInternalServerError, 50004, "TOKEN_ISSUE_FAILED", nil)
+				envelope.Err(w, r, http.StatusInternalServerError, 50004, "TOKEN_ISSUE_FAILED", map[string]any{"error": err.Error()})
 				return
 			}
 			envelope.OK(w, r, tok)
@@ -201,11 +208,12 @@ func NewRouter(cfg *config.Config, st *store.Store) http.Handler {
 			}
 			var curOrg *uint64
 			if orgs, err := st.ListUserOrgs(r.Context(), u.ID); err == nil && len(orgs) > 0 {
-				curOrg = &orgs[0].ID
+				oid := orgs[0].ID
+				curOrg = &oid
 			}
 			tok, err := issueTokens(cfg, st, u, curOrg)
 			if err != nil {
-				envelope.Err(w, r, http.StatusInternalServerError, 50004, "TOKEN_ISSUE_FAILED", nil)
+				envelope.Err(w, r, http.StatusInternalServerError, 50004, "TOKEN_ISSUE_FAILED", map[string]any{"error": err.Error()})
 				return
 			}
 			_ = st.RevokeRefreshToken(r.Context(), h)
