@@ -46,6 +46,20 @@ docker pull docker.m.daocloud.io/library/nginx:1.26-alpine
 
 ---
 
+## 故障：`read /app/config.yaml: is a directory`（gateway / platform 重启）
+
+**原因**：`docker-compose` 把 **`MODLINK_CONFIG_FILE` 指向的路径** 挂到容器 **`/app/config.yaml`** 时，**主机上该路径是目录或不存在**（Docker 会生成空目录），Go 读配置就变成「是个目录」。
+
+**处理**：
+
+1. 使用**真实文件**的**绝对路径**，且先确认：  
+   `test -f /opt/model_link_ai/deploy/docker/config.local.yaml && echo OK`  
+2. 启动前导出（示例）：  
+   `export MODLINK_CONFIG_FILE=/opt/model_link_ai/deploy/docker/config.local.yaml`  
+3. 删掉错误挂载产生的目录（若误建在项目里）：**只删你确认是误生成的那一层**，然后 `docker compose ... up -d --force-recreate platform gateway`。
+
+---
+
 ## 故障：`migrate` 容器 `exit 1`
 
 先看日志：
