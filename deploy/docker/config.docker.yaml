@@ -1,5 +1,8 @@
 # Docker Compose 默认挂载路径：/app/config.yaml
-# 数据库主机名为 compose 服务名 mysql；若使用百度云 RDS，改为 RDS 内网地址并删掉 compose 里的 mysql 服务。
+#
+# 重要：在容器内访问 MySQL 时，DSN 主机名必须是「compose 服务名」mysql，禁止写 127.0.0.1
+# （127.0.0.1 在容器里是本容器自己，会导致 platform/gateway 无限重启）。
+# 若使用百度云 RDS，改为 RDS 内网地址并删掉 compose 里的 mysql 服务。
 
 server:
   gateway_listen: ":8080"

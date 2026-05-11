@@ -10,7 +10,8 @@ services:
   mysql:
     image: mysql:8.0
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      # 默认仅便于开发/首次部署；生产请在 .env 设置 MYSQL_ROOT_PASSWORD 并改库密码
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-123456}
       MYSQL_DATABASE: modlink_cloud
       MYSQL_USER: modlink
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-modlink}
@@ -19,9 +20,9 @@ services:
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
-    # 若修改 MYSQL_ROOT_PASSWORD，请将下方 -proot 改为与实际一致，或改用 .my.cnf
+    # 使用容器内 MYSQL_ROOT_PASSWORD，避免与 .env 覆盖不一致
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p\"$$MYSQL_ROOT_PASSWORD\" || exit 1"]
       interval: 5s
       timeout: 5s
       retries: 36
@@ -43,7 +44,7 @@ services:
       mysql:
         condition: service_healthy
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-123456}
       MYSQL_HOST: mysql
       MYSQL_USER: root
     volumes:

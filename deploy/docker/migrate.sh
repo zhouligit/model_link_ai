@@ -2,7 +2,7 @@
 set -e
 host="${MYSQL_HOST:-mysql}"
 user="${MYSQL_USER:-root}"
-pass="${MYSQL_ROOT_PASSWORD:-root}"
+pass="${MYSQL_ROOT_PASSWORD:-123456}"
 export MYSQL_PWD="$pass"
 
 until mysqladmin ping -h "$host" -u"$user" --silent 2>/dev/null; do

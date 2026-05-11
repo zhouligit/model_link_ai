@@ -42,8 +42,8 @@ docker compose -f docker-compose.prod.yml up -d --build
 2. **初始化库表**（一次性）：
 
    ```bash
-   mysql -h127.0.0.1 -uroot -proot modlink_cloud < modlink-gateway/migrations/001_schema.sql
-   mysql -h127.0.0.1 -uroot -proot modlink_cloud < modlink-gateway/migrations/002_seed.sql
+   mysql -h127.0.0.1 -uroot -p123456 modlink_cloud < modlink-gateway/migrations/001_schema.sql
+   mysql -h127.0.0.1 -uroot -p123456 modlink_cloud < modlink-gateway/migrations/002_seed.sql
    ```
 
 3. **配置**：复制 `modlink-gateway/configs/config.example.yaml` 为 `configs/config.yaml`，修改 `database.dsn`、`jwt.secret`、`upstream.mode`（`mock` / `openrouter`）等。

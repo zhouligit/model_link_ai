@@ -46,6 +46,29 @@ docker pull docker.m.daocloud.io/library/nginx:1.26-alpine
 
 ---
 
+## 故障：`platform` / `gateway` / `nginx` 一直 `Restarting`，8100 连不上
+
+**最常见原因**：`config.local.yaml` 里 **`database.dsn` 写成了 `127.0.0.1` 或宿主机 IP**。  
+在 Compose 网络里，MySQL 的服务名是 **`mysql`**，DSN 必须是 **`tcp(mysql:3306)/...`**（与 `deploy/docker/config.docker.yaml` 一致）。
+
+先看退出原因：
+
+```bash
+docker logs model_link_ai-platform-1 --tail=40
+docker logs model_link_ai-gateway-1 --tail=40
+```
+
+若出现 **`database ping: ... connection refused`** 或 **`dial tcp 127.0.0.1:3306`**，请改 DSN 后重启：
+
+```bash
+nano deploy/docker/config.local.yaml   # database.dsn 中 host 改为 mysql
+docker compose -f docker-compose.prod.yml -f docker-compose.cn-mirror.yml up -d
+```
+
+**次常见原因**：`jwt.secret` 长度不足 16（`config.Load` 会直接失败），日志里会有 `jwt.secret` 相关报错。
+
+---
+
 ## 一键启动（自带 MySQL）
 
 在仓库根目录：
@@ -73,7 +96,7 @@ docker compose -f docker-compose.prod.yml up -d
 
 | 变量 | 说明 |
 |------|------|
-| `MYSQL_ROOT_PASSWORD` | 与 `config.local.yaml` 里 DSN 中的账号密码需一致（自建 MySQL 时） |
+| `MYSQL_ROOT_PASSWORD` | 默认 **`123456`**（仓库约定，仅开发/首次部署）；生产在 `.env` 覆盖并 **ALTER USER** 改库；**已有数据卷时改默认值不会自动改库里 root 密码** |
 | `MODLINK_CONFIG_FILE` | 挂载到容器内的业务配置文件绝对路径 |
 | `HTTP_PORT` | 模链云 Nginx 宿主机端口，**默认 8100** |
 | `IMAGE_TAG` | 镜像标签，默认 `local` |
