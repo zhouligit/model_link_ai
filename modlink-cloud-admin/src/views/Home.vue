@@ -66,8 +66,9 @@
                 </template>
               </el-table-column>
               <el-table-column prop="status" label="状态" width="100" />
-              <el-table-column label="操作" width="120" fixed="right">
+              <el-table-column label="操作" width="200" fixed="right">
                 <template #default="{ row }">
+                  <el-button link type="primary" @click="openChannelViewDrawer(row)">查看密钥</el-button>
                   <el-button link type="primary" @click="openChannelKeyDialog(row)">配置密钥</el-button>
                 </template>
               </el-table-column>
@@ -125,6 +126,44 @@
           <el-table-column prop="created_at" label="创建时间" min-width="156" show-overflow-tooltip />
         </el-table>
         <p v-if="userDetailNote" class="drawer-note">{{ userDetailNote }}</p>
+      </template>
+    </el-drawer>
+
+    <el-drawer
+      v-model="channelViewDrawerVisible"
+      title="渠道与上游密钥"
+      size="480px"
+      destroy-on-close
+      @closed="onChannelViewClosed"
+    >
+      <el-skeleton v-if="channelViewLoading" :rows="6" animated />
+      <template v-else-if="channelViewData">
+        <p class="drawer-muted">
+          以下为<strong>数据库</strong>中保存的密钥。若服务器配置了
+          <code>MODLINK_OPENROUTER_API_KEY</code> 或配置文件中的
+          <code>openrouter_api_key</code>，网关会<strong>优先</strong>使用它们，可能与这里不一致。
+        </p>
+        <el-descriptions :column="1" border size="small" class="drawer-block">
+          <el-descriptions-item label="ID">{{ channelViewData.id }}</el-descriptions-item>
+          <el-descriptions-item label="名称">{{ fmtCell(channelViewData.name) }}</el-descriptions-item>
+          <el-descriptions-item label="类型">{{ fmtCell(channelViewData.type) }}</el-descriptions-item>
+          <el-descriptions-item label="Base URL">{{ fmtCell(channelViewData.base_url) }}</el-descriptions-item>
+          <el-descriptions-item label="状态">{{ fmtCell(channelViewData.status) }}</el-descriptions-item>
+        </el-descriptions>
+        <h4 class="drawer-h">API Key</h4>
+        <template v-if="channelViewData.api_key_set && channelViewData.api_key">
+          <div class="secret-row">
+            <el-input
+              :model-value="String(channelViewData.api_key)"
+              type="textarea"
+              :rows="3"
+              readonly
+              class="secret-input"
+            />
+            <el-button type="primary" @click="copyText(String(channelViewData.api_key))">复制</el-button>
+          </div>
+        </template>
+        <p v-else class="drawer-muted">未在数据库中配置有效密钥，请使用「配置密钥」保存。</p>
       </template>
     </el-drawer>
 
@@ -217,6 +256,10 @@ const userDetailKeys = ref<Record<string, unknown>[]>([])
 const userDetailWallet = ref<Record<string, unknown> | null>(null)
 const userDetailNote = ref('')
 
+const channelViewDrawerVisible = ref(false)
+const channelViewLoading = ref(false)
+const channelViewData = ref<AdminChannelDetail | null>(null)
+
 const channelKeyDialogVisible = ref(false)
 const channelKeySaving = ref(false)
 const channelKeyForm = reactive({
@@ -251,6 +294,16 @@ type AdminUserDetailPayload = {
   api_keys: Record<string, unknown>[]
   wallet: Record<string, unknown> | null
   note?: string
+}
+
+type AdminChannelDetail = {
+  id: number
+  name?: string
+  type?: string
+  base_url?: string
+  status?: string
+  api_key?: string
+  api_key_set?: boolean
 }
 
 async function openUserDrawer(row: Record<string, unknown>) {
@@ -289,7 +342,7 @@ const panelTitle = computed(() => {
 
 const panelDesc = computed(() => {
   if (section.value === 'users') return '平台注册用户；点「详情」查看账户、钱包与 API Key 前缀'
-  if (section.value === 'channels') return '在页面配置 OpenRouter Key；列表显示是否已在库中写入有效密钥'
+  if (section.value === 'channels') return '可查看/配置数据库中的上游密钥（仅管理员）'
   return '对外可选模型；新增会写入目录、路由与计价三表'
 })
 
@@ -301,6 +354,63 @@ function resetModelForm() {
   modelForm.input_per_1k_cents = 1
   modelForm.output_per_1k_cents = 3
   modelForm.enabled = true
+}
+
+async function copyText(text: string) {
+  const t = text.trim()
+  if (!t) {
+    ElMessage.warning('没有可复制的内容')
+    return
+  }
+  try {
+    await navigator.clipboard.writeText(t)
+    ElMessage.success('已复制到剪贴板')
+  } catch {
+    try {
+      const ta = document.createElement('textarea')
+      ta.value = t
+      ta.style.position = 'fixed'
+      ta.style.left = '-9999px'
+      document.body.appendChild(ta)
+      ta.select()
+      document.execCommand('copy')
+      document.body.removeChild(ta)
+      ElMessage.success('已复制到剪贴板')
+    } catch {
+      ElMessage.error('复制失败，请手动选择文本复制')
+    }
+  }
+}
+
+function onChannelViewClosed() {
+  channelViewData.value = null
+}
+
+async function openChannelViewDrawer(row: Record<string, unknown>) {
+  const id = Number(row.id) || 0
+  if (!id) {
+    ElMessage.warning('渠道无效')
+    return
+  }
+  channelViewDrawerVisible.value = true
+  channelViewLoading.value = true
+  channelViewData.value = null
+  try {
+    const { data } = await api.get<{ code: number; message?: string; data?: AdminChannelDetail }>(
+      `/admin/channels/${id}`,
+    )
+    if (data.code !== 0 || !data.data) {
+      ElMessage.error(data.message || '加载失败')
+      channelViewDrawerVisible.value = false
+      return
+    }
+    channelViewData.value = data.data
+  } catch {
+    ElMessage.error('请求失败')
+    channelViewDrawerVisible.value = false
+  } finally {
+    channelViewLoading.value = false
+  }
 }
 
 function resetChannelKeyForm() {
@@ -506,5 +616,16 @@ onMounted(load)
   font-size: 13px;
   color: #64748b;
   line-height: 1.5;
+}
+.secret-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 10px;
+}
+.secret-row .secret-input {
+  flex: 1 1 200px;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
 }
 </style>

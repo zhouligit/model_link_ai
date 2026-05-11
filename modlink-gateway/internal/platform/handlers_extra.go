@@ -594,6 +594,36 @@ func adminChannels(st *store.Store) http.HandlerFunc {
 	}
 }
 
+// adminGetChannel returns channel metadata and decoded upstream api_key (admin only).
+func adminGetChannel(st *store.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id, err := strconv.ParseUint(chi.URLParam(r, "channel_id"), 10, 64)
+		if err != nil || id == 0 {
+			envelope.Err(w, r, http.StatusBadRequest, 40001, "BAD_CHANNEL_ID", nil)
+			return
+		}
+		ch, err := st.GetChannel(r.Context(), id)
+		if err != nil {
+			envelope.Err(w, r, http.StatusInternalServerError, 50001, "QUERY_FAILED", nil)
+			return
+		}
+		if ch == nil {
+			envelope.Err(w, r, http.StatusNotFound, 40401, "CHANNEL_NOT_FOUND", nil)
+			return
+		}
+		apiKey := ""
+		if k, err := store.DecodeChannelAPIKey(ch.APIKeyCipher); err == nil {
+			apiKey = strings.TrimSpace(k)
+		}
+		envelope.OK(w, r, map[string]any{
+			"id": ch.ID, "name": ch.Name, "type": ch.ChannelType,
+			"base_url": ch.BaseURL, "status": ch.Status,
+			"api_key":     apiKey,
+			"api_key_set": apiKey != "",
+		})
+	}
+}
+
 func adminPatchChannel(st *store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id, err := strconv.ParseUint(chi.URLParam(r, "channel_id"), 10, 64)

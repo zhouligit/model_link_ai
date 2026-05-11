@@ -271,6 +271,7 @@ func NewRouter(cfg *config.Config, st *store.Store) http.Handler {
 				r.Get("/admin/users", adminUsers(st))
 				r.Get("/admin/users/{user_id}", adminUserDetail(st))
 				r.Get("/admin/channels", adminChannels(st))
+				r.Get("/admin/channels/{channel_id}", adminGetChannel(st))
 				r.Patch("/admin/channels/{channel_id}", adminPatchChannel(st))
 				r.Get("/admin/models", adminModels(st))
 				r.Post("/admin/models", adminCreateModel(st))
