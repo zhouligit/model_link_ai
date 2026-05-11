@@ -10,8 +10,8 @@ services:
   mysql:
     image: mysql:8.0
     environment:
-      # 默认仅便于开发/首次部署；生产请在 .env 设置 MYSQL_ROOT_PASSWORD 并改库密码
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-123456}
+      # 默认与历史仓库一致；生产请在 .env 设置 MYSQL_ROOT_PASSWORD（已有数据卷不会随此处变更而改库内密码）
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
       MYSQL_DATABASE: modlink_cloud
       MYSQL_USER: modlink
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-modlink}
@@ -44,7 +44,7 @@ services:
       mysql:
         condition: service_healthy
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-123456}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
       MYSQL_HOST: mysql
       MYSQL_USER: root
     volumes:

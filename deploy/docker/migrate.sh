@@ -3,7 +3,7 @@ set -euo pipefail
 
 host="${MYSQL_HOST:-mysql}"
 user="${MYSQL_USER:-root}"
-pass="${MYSQL_ROOT_PASSWORD:-123456}"
+pass="${MYSQL_ROOT_PASSWORD:-root}"
 
 echo "migrate: host=$host user=$user (password hidden)"
 

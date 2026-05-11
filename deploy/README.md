@@ -56,7 +56,7 @@ docker logs model_link_ai-migrate-1 --tail=80
 
 常见原因：
 
-1. **数据卷里的 MySQL 仍是旧 root 密码**，而 migrate 用的是 compose 里新的默认 **`123456`** → 认证失败。处理：在 **`.env`** 里设 **`MYSQL_ROOT_PASSWORD=` 与当前数据卷一致**（例如仍是 `root`），或 **`docker compose ... down -v` 清空卷** 后重起（**会删库**）。  
+1. **数据卷里的 MySQL root 密码** 与 migrate 使用的 **`MYSQL_ROOT_PASSWORD`**（compose 默认 **`root`**，或由 `.env` 覆盖）不一致 → 认证失败。处理：在 **`.env`** 里设 **`MYSQL_ROOT_PASSWORD=` 与当前数据卷一致**，或 **`docker compose ... down -v` 清空卷** 后重起（**会删库**）。  
 2. **001 曾执行一半又重跑**：表已存在导致 `CREATE TABLE` 报错 → 开发环境可 **`down -v`** 重来。  
 3. **网络**：migrate 连不上 `mysql:3306`（极少见，若 `depends_on: healthy` 已满足一般不是）。
 
@@ -114,7 +114,7 @@ docker compose -f docker-compose.prod.yml up -d
 
 | 变量 | 说明 |
 |------|------|
-| `MYSQL_ROOT_PASSWORD` | 默认 **`123456`**（仓库约定，仅开发/首次部署）；生产在 `.env` 覆盖并 **ALTER USER** 改库；**已有数据卷时改默认值不会自动改库里 root 密码** |
+| `MYSQL_ROOT_PASSWORD` | 默认 **`root`**（与历史 compose 一致）；生产在 `.env` 覆盖并 **ALTER USER** 改库；**已有数据卷时改默认值不会自动改库里 root 密码** |
 | `MODLINK_CONFIG_FILE` | 挂载到容器内的业务配置文件绝对路径 |
 | `HTTP_PORT` | 模链云 Nginx 宿主机端口，**默认 8100** |
 | `IMAGE_TAG` | 镜像标签，默认 `local` |
