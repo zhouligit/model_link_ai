@@ -26,7 +26,7 @@ upstream:
   mode: mock              # mock | openrouter
   timeout_seconds: 120
   openrouter_base_url: "https://openrouter.ai/api/v1"
-  # 当数据库 channels 表无可用密钥时，回退使用该环境变量（生产请只用 DB 或密钥托管）
+  # 优先级：环境变量 MODLINK_OPENROUTER_API_KEY > 本字段 > 数据库 channels.api_key_cipher
   openrouter_api_key: ""
 
 # 支付：mock 直接标记订单成功并入账；真实渠道后续接 SDK

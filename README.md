@@ -73,7 +73,7 @@ cd modlink-cloud-admin && npm install && npm run dev
 
 ## 外部集成说明（mock / 真接）
 
-- **推理上游**：`configs/config.yaml` 中 `upstream.mode`：`mock` 返回固定 SSE/JSON；`openrouter` 转发至渠道 `base_url`，密钥优先读数据库 `channels.api_key_cipher`（`plain:base64` 格式），否则回退 `upstream.openrouter_api_key`。
+- **推理上游**：`configs/config.yaml` 中 `upstream.mode`：`mock` 返回固定 SSE/JSON；`openrouter` 转发至渠道 `base_url`。上游密钥优先级：**`MODLINK_OPENROUTER_API_KEY` 环境变量** > **`upstream.openrouter_api_key`** > 数据库 **`channels.api_key_cipher`**（管理后台 **上游渠道 → 配置密钥** 会写入该字段；`plain:base64` 存储格式）。
 - **支付**：`payment.mode: mock` 时，充值下单后调用 Platform **`POST /mlk/platform/v1/payment/mock/complete`**（Body：`{"order_id":"..."}`）模拟入账。
 - **短信**：接口占位；`sms.mode: mock`。
 

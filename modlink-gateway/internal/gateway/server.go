@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -130,9 +131,17 @@ func chatCompletions(cfg *config.Config, st *store.Store) http.HandlerFunc {
 		payload["model"] = json.RawMessage(mm)
 		outBody, _ := json.Marshal(payload)
 
-		upstreamKey, err := store.DecodeChannelAPIKey(ch.APIKeyCipher)
-		if err != nil || upstreamKey == "" {
+		// 上游 Key：环境变量 > 配置文件 > 数据库渠道（便于本地用 config 覆盖种子里的占位密钥）
+		upstreamKey := strings.TrimSpace(os.Getenv("MODLINK_OPENROUTER_API_KEY"))
+		if upstreamKey == "" {
 			upstreamKey = strings.TrimSpace(cfg.Upstream.OpenRouterAPIKey)
+		}
+		if upstreamKey == "" {
+			var err error
+			upstreamKey, err = store.DecodeChannelAPIKey(ch.APIKeyCipher)
+			if err != nil {
+				upstreamKey = ""
+			}
 		}
 
 		mode := strings.ToLower(strings.TrimSpace(cfg.Upstream.Mode))
@@ -142,7 +151,7 @@ func chatCompletions(cfg *config.Config, st *store.Store) http.HandlerFunc {
 		}
 
 		if upstreamKey == "" {
-			envelope.Err(w, r, http.StatusInternalServerError, 50001, "UPSTREAM_KEY_MISSING", map[string]any{"hint": "set upstream.openrouter_api_key or channels.api_key_cipher"})
+			envelope.Err(w, r, http.StatusInternalServerError, 50001, "UPSTREAM_KEY_MISSING", map[string]any{"hint": "set MODLINK_OPENROUTER_API_KEY / upstream.openrouter_api_key, or admin PATCH /admin/channels/{id} api_key"})
 			return
 		}
 

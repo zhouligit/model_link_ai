@@ -49,19 +49,30 @@
               </template>
             </el-table-column>
           </el-table>
-          <el-table
-            v-else-if="section === 'channels'"
-            :data="channels"
-            size="small"
-            stripe
-            border
-            empty-text="暂无数据"
-          >
-            <el-table-column prop="id" label="ID" width="80" />
-            <el-table-column prop="name" label="名称" min-width="140" />
-            <el-table-column prop="base_url" label="Base URL" min-width="220" show-overflow-tooltip />
-            <el-table-column prop="status" label="状态" width="100" />
-          </el-table>
+          <template v-else-if="section === 'channels'">
+            <p class="channel-hint">
+              在此填写 OpenRouter 的 API Key（写入数据库）。若服务器上仍配置了环境变量
+              <code>MODLINK_OPENROUTER_API_KEY</code> 或配置文件里的
+              <code>openrouter_api_key</code>，会<strong>优先于</strong>此处生效。
+            </p>
+            <el-table :data="channels" size="small" stripe border empty-text="暂无数据">
+              <el-table-column prop="id" label="ID" width="80" />
+              <el-table-column prop="name" label="名称" min-width="140" />
+              <el-table-column prop="base_url" label="Base URL" min-width="200" show-overflow-tooltip />
+              <el-table-column label="上游密钥" width="120">
+                <template #default="{ row }">
+                  <el-tag v-if="row.api_key_set" type="success" size="small">已配置</el-tag>
+                  <el-tag v-else type="info" size="small">未配置</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="status" label="状态" width="100" />
+              <el-table-column label="操作" width="120" fixed="right">
+                <template #default="{ row }">
+                  <el-button link type="primary" @click="openChannelKeyDialog(row)">配置密钥</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+          </template>
           <el-table
             v-else-if="section === 'models'"
             :data="models"
@@ -116,6 +127,33 @@
         <p v-if="userDetailNote" class="drawer-note">{{ userDetailNote }}</p>
       </template>
     </el-drawer>
+
+    <el-dialog
+      v-model="channelKeyDialogVisible"
+      title="配置上游 API Key"
+      width="480px"
+      destroy-on-close
+      @closed="resetChannelKeyForm"
+    >
+      <p class="dialog-muted">
+        渠道：<strong>{{ channelKeyForm.channel_label }}</strong>。仅保存 OpenRouter（或兼容服务）的密钥；已保存的密钥不会在页面回显。
+      </p>
+      <el-form label-width="0">
+        <el-form-item>
+          <el-input
+            v-model="channelKeyForm.api_key"
+            type="password"
+            show-password
+            placeholder="粘贴 sk-or-v1-..."
+            autocomplete="off"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="channelKeyDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="channelKeySaving" @click="submitChannelKey">保存</el-button>
+      </template>
+    </el-dialog>
 
     <el-dialog v-model="modelDialogVisible" title="添加模型" width="520px" destroy-on-close @closed="resetModelForm">
       <el-form :model="modelForm" label-width="140px" label-position="left">
@@ -178,6 +216,14 @@ const userDetailUser = ref<Record<string, unknown> | null>(null)
 const userDetailKeys = ref<Record<string, unknown>[]>([])
 const userDetailWallet = ref<Record<string, unknown> | null>(null)
 const userDetailNote = ref('')
+
+const channelKeyDialogVisible = ref(false)
+const channelKeySaving = ref(false)
+const channelKeyForm = reactive({
+  channel_id: 0,
+  channel_label: '',
+  api_key: '',
+})
 
 const modelDialogVisible = ref(false)
 const modelSaving = ref(false)
@@ -243,7 +289,7 @@ const panelTitle = computed(() => {
 
 const panelDesc = computed(() => {
   if (section.value === 'users') return '平台注册用户；点「详情」查看账户、钱包与 API Key 前缀'
-  if (section.value === 'channels') return 'OpenRouter 等上游渠道配置'
+  if (section.value === 'channels') return '在页面配置 OpenRouter Key；列表显示是否已在库中写入有效密钥'
   return '对外可选模型；新增会写入目录、路由与计价三表'
 })
 
@@ -255,6 +301,49 @@ function resetModelForm() {
   modelForm.input_per_1k_cents = 1
   modelForm.output_per_1k_cents = 3
   modelForm.enabled = true
+}
+
+function resetChannelKeyForm() {
+  channelKeyForm.channel_id = 0
+  channelKeyForm.channel_label = ''
+  channelKeyForm.api_key = ''
+}
+
+function openChannelKeyDialog(row: Record<string, unknown>) {
+  resetChannelKeyForm()
+  channelKeyForm.channel_id = Number(row.id) || 0
+  channelKeyForm.channel_label = `${row.id} · ${row.name ?? ''}`
+  channelKeyDialogVisible.value = true
+}
+
+async function submitChannelKey() {
+  const id = channelKeyForm.channel_id
+  const key = channelKeyForm.api_key.trim()
+  if (!id) {
+    ElMessage.warning('渠道无效')
+    return
+  }
+  if (!key) {
+    ElMessage.warning('请填写 API Key')
+    return
+  }
+  channelKeySaving.value = true
+  try {
+    const { data } = await api.patch<{ code: number; message?: string }>(`/admin/channels/${id}`, {
+      api_key: key,
+    })
+    if (data.code !== 0) {
+      ElMessage.error(data.message || '保存失败')
+      return
+    }
+    ElMessage.success('已保存（网关将使用该渠道密钥，除非环境变量/配置文件覆盖）')
+    channelKeyDialogVisible.value = false
+    await load()
+  } catch {
+    ElMessage.error('请求失败')
+  } finally {
+    channelKeySaving.value = false
+  }
 }
 
 function openModelDialog() {
@@ -398,6 +487,24 @@ onMounted(load)
   margin-top: 12px;
   font-size: 12px;
   color: #94a3b8;
+  line-height: 1.5;
+}
+.channel-hint {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: #64748b;
+  line-height: 1.55;
+}
+.channel-hint code {
+  font-size: 12px;
+  background: #f1f5f9;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+.dialog-muted {
+  margin: 0 0 14px;
+  font-size: 13px;
+  color: #64748b;
   line-height: 1.5;
 }
 </style>

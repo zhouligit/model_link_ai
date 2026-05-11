@@ -69,6 +69,35 @@ func DecodeChannelAPIKey(cipher string) (string, error) {
 	return "", errors.New("unsupported cipher (configure plain:base64 or extend KMS)")
 }
 
+// EncodeChannelAPIKeyPlain stores cleartext as plain:base64 (admin UI / dev).
+func EncodeChannelAPIKeyPlain(plain string) string {
+	plain = strings.TrimSpace(plain)
+	if plain == "" {
+		return ""
+	}
+	return "plain:" + base64.StdEncoding.EncodeToString([]byte(plain))
+}
+
+// UpdateChannelAPIKeyCipher sets channels.api_key_cipher (plain:base64).
+func (s *Store) UpdateChannelAPIKeyCipher(ctx context.Context, channelID uint64, cipher string) error {
+	cipher = strings.TrimSpace(cipher)
+	if cipher == "" {
+		return errors.New("cipher required")
+	}
+	res, err := s.DB.ExecContext(ctx, `UPDATE channels SET api_key_cipher = ? WHERE id = ?`, cipher, channelID)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return ErrChannelNotFound
+	}
+	return nil
+}
+
 func (s *Store) ListEnabledModels(ctx context.Context) ([]string, error) {
 	rows, err := s.DB.QueryContext(ctx,
 		`SELECT model_id FROM platform_models WHERE enabled = 1 ORDER BY model_id`)

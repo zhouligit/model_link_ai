@@ -1,6 +1,7 @@
 package platform
 
 import (
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -159,9 +160,13 @@ func listKeys(st *store.Store) http.HandlerFunc {
 		}
 		items := make([]map[string]any, 0, len(keys))
 		for _, k := range keys {
-			items = append(items, map[string]any{
+			row := map[string]any{
 				"id": k.ID, "name": k.Name, "scope": k.Scope, "key_prefix": k.KeyPrefix, "status": k.Status,
-			})
+			}
+			if k.OrgID != nil {
+				row["org_id"] = *k.OrgID
+			}
+			items = append(items, row)
 		}
 		envelope.OK(w, r, map[string]any{"items": items})
 	}
@@ -323,9 +328,21 @@ func getOrder(st *store.Store) http.HandlerFunc {
 			envelope.Err(w, r, http.StatusNotFound, 40401, "NOT_FOUND", nil)
 			return
 		}
-		envelope.OK(w, r, map[string]any{
+		out := map[string]any{
 			"id": o.ID, "status": o.Status, "amount_cents": o.AmountCents, "channel": o.Channel,
-		})
+			"order_type": o.OrderType, "currency": o.Currency,
+			"created_at": o.CreatedAt.UTC().Format(time.RFC3339Nano),
+		}
+		if o.OrgID != nil {
+			out["org_id"] = *o.OrgID
+		}
+		if o.PaidAt.Valid {
+			out["paid_at"] = o.PaidAt.Time.UTC().Format(time.RFC3339Nano)
+		}
+		if o.ProviderTradeNo.Valid {
+			out["provider_trade_no"] = o.ProviderTradeNo.String
+		}
+		envelope.OK(w, r, out)
 	}
 }
 
@@ -337,7 +354,8 @@ func listOrders(st *store.Store) http.HandlerFunc {
 			return
 		}
 		rows, err := st.DB.QueryContext(r.Context(),
-			`SELECT id, amount_cents, channel, status, created_at FROM orders WHERE user_id = ? ORDER BY id DESC LIMIT 50`, cl.UserID)
+			`SELECT id, org_id, order_type, amount_cents, currency, channel, status, created_at, paid_at
+			 FROM orders WHERE user_id = ? ORDER BY id DESC LIMIT 50`, cl.UserID)
 		if err != nil {
 			envelope.Err(w, r, http.StatusInternalServerError, 50001, "QUERY_FAILED", nil)
 			return
@@ -346,13 +364,25 @@ func listOrders(st *store.Store) http.HandlerFunc {
 		var items []map[string]any
 		for rows.Next() {
 			var id uint64
+			var org sql.NullInt64
+			var orderType, ch, stt, curr string
 			var amt int64
-			var ch, stt string
-			var ct interface{}
-			if err := rows.Scan(&id, &amt, &ch, &stt, &ct); err != nil {
+			var ct time.Time
+			var paid sql.NullTime
+			if err := rows.Scan(&id, &org, &orderType, &amt, &curr, &ch, &stt, &ct, &paid); err != nil {
 				continue
 			}
-			items = append(items, map[string]any{"id": id, "amount_cents": amt, "channel": ch, "status": stt})
+			row := map[string]any{
+				"id": id, "order_type": orderType, "amount_cents": amt, "currency": curr,
+				"channel": ch, "status": stt, "created_at": ct.UTC().Format(time.RFC3339Nano),
+			}
+			if org.Valid {
+				row["org_id"] = uint64(org.Int64)
+			}
+			if paid.Valid {
+				row["paid_at"] = paid.Time.UTC().Format(time.RFC3339Nano)
+			}
+			items = append(items, row)
 		}
 		envelope.OK(w, r, map[string]any{"items": items})
 	}
@@ -538,7 +568,7 @@ func adminUserDetail(st *store.Store) http.HandlerFunc {
 
 func adminChannels(st *store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		rows, err := st.DB.QueryContext(r.Context(), `SELECT id, name, channel_type, base_url, status FROM channels ORDER BY id`)
+		rows, err := st.DB.QueryContext(r.Context(), `SELECT id, name, channel_type, base_url, status, api_key_cipher FROM channels ORDER BY id`)
 		if err != nil {
 			envelope.Err(w, r, http.StatusInternalServerError, 50001, "QUERY_FAILED", nil)
 			return
@@ -547,13 +577,61 @@ func adminChannels(st *store.Store) http.HandlerFunc {
 		var items []map[string]any
 		for rows.Next() {
 			var id uint64
-			var name, ctype, base, stt string
-			if err := rows.Scan(&id, &name, &ctype, &base, &stt); err != nil {
+			var name, ctype, base, stt, cipher string
+			if err := rows.Scan(&id, &name, &ctype, &base, &stt, &cipher); err != nil {
 				continue
 			}
-			items = append(items, map[string]any{"id": id, "name": name, "type": ctype, "base_url": base, "status": stt})
+			apiKeySet := false
+			if k, err := store.DecodeChannelAPIKey(cipher); err == nil && strings.TrimSpace(k) != "" {
+				apiKeySet = true
+			}
+			items = append(items, map[string]any{
+				"id": id, "name": name, "type": ctype, "base_url": base, "status": stt,
+				"api_key_set": apiKeySet,
+			})
 		}
 		envelope.OK(w, r, map[string]any{"items": items})
+	}
+}
+
+func adminPatchChannel(st *store.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id, err := strconv.ParseUint(chi.URLParam(r, "channel_id"), 10, 64)
+		if err != nil || id == 0 {
+			envelope.Err(w, r, http.StatusBadRequest, 40001, "BAD_CHANNEL_ID", nil)
+			return
+		}
+		ch, err := st.GetChannel(r.Context(), id)
+		if err != nil {
+			envelope.Err(w, r, http.StatusInternalServerError, 50001, "QUERY_FAILED", nil)
+			return
+		}
+		if ch == nil {
+			envelope.Err(w, r, http.StatusNotFound, 40401, "CHANNEL_NOT_FOUND", nil)
+			return
+		}
+		var body struct {
+			APIKey string `json:"api_key"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			envelope.Err(w, r, http.StatusBadRequest, 40001, "BAD_JSON", nil)
+			return
+		}
+		key := strings.TrimSpace(body.APIKey)
+		if key == "" {
+			envelope.Err(w, r, http.StatusBadRequest, 40002, "API_KEY_REQUIRED", nil)
+			return
+		}
+		cipher := store.EncodeChannelAPIKeyPlain(key)
+		if err := st.UpdateChannelAPIKeyCipher(r.Context(), id, cipher); err != nil {
+			if errors.Is(err, store.ErrChannelNotFound) {
+				envelope.Err(w, r, http.StatusNotFound, 40401, "CHANNEL_NOT_FOUND", nil)
+				return
+			}
+			envelope.Err(w, r, http.StatusInternalServerError, 50001, "UPDATE_FAILED", map[string]any{"error": err.Error()})
+			return
+		}
+		envelope.OK(w, r, map[string]any{"ok": true})
 	}
 }
 

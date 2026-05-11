@@ -104,6 +104,9 @@ func (c *Config) normalize() {
 	if strings.TrimSpace(c.Upstream.Mode) == "" {
 		c.Upstream.Mode = "mock"
 	}
+	if v := strings.TrimSpace(os.Getenv("MODLINK_OPENROUTER_API_KEY")); v != "" {
+		c.Upstream.OpenRouterAPIKey = v
+	}
 	if strings.TrimSpace(c.Payment.Mode) == "" {
 		c.Payment.Mode = "mock"
 	}
