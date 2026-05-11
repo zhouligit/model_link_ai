@@ -1,6 +1,9 @@
 <template>
   <el-container class="layout">
-    <el-header><strong>模链云</strong> · 控制台</el-header>
+    <el-header class="hdr">
+      <span class="hdr-brand"><strong>模链云</strong> · 控制台</span>
+      <el-button type="danger" link @click="doLogout">退出登录</el-button>
+    </el-header>
     <el-main>
       <el-row :gutter="16">
         <el-col :span="8">
@@ -31,8 +34,11 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { fetchWallet, createApiKey, recharge, mockPayOrder } from '../api/client'
+import { useRouter } from 'vue-router'
+import { fetchWallet, createApiKey, recharge, mockPayOrder, logoutAndClearLocal } from '../api/client'
 import { ElMessage } from 'element-plus'
+
+const router = useRouter()
 
 const wallet = ref<{ balance_cents: number; currency: string } | null>(null)
 const amt = ref(1000)
@@ -66,6 +72,12 @@ async function makeKey() {
   secret.value = `保存此密钥（仅显示一次）：\n${r.data.secret}`
 }
 
+async function doLogout() {
+  await logoutAndClearLocal()
+  ElMessage.success('已退出')
+  router.push('/login')
+}
+
 onMounted(load)
 </script>
 
@@ -73,9 +85,15 @@ onMounted(load)
 .layout {
   min-height: 100vh;
 }
-.el-header {
+.hdr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   line-height: 60px;
   border-bottom: 1px solid #e5e7eb;
+}
+.hdr-brand {
+  font-size: 16px;
 }
 code {
   background: #f1f5f9;

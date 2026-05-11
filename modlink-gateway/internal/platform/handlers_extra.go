@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/modlinkcloud/modlink-gateway/internal/config"
@@ -436,9 +437,83 @@ func adminUsers(st *store.Store) http.HandlerFunc {
 		for _, u := range list {
 			items = append(items, map[string]any{
 				"id": u.ID, "email": u.Email, "display_name": u.DisplayName, "role": u.Role, "status": u.Status,
+				"created_at": u.CreatedAt.UTC().Format(time.RFC3339Nano),
 			})
 		}
 		envelope.OK(w, r, map[string]any{"items": items})
+	}
+}
+
+func adminUserDetail(st *store.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		idStr := chi.URLParam(r, "user_id")
+		uid, err := strconv.ParseUint(idStr, 10, 64)
+		if err != nil || uid == 0 {
+			envelope.Err(w, r, http.StatusBadRequest, 40002, "INVALID_USER_ID", nil)
+			return
+		}
+		u, err := st.AdminGetUserDetail(r.Context(), uid)
+		if err != nil {
+			envelope.Err(w, r, http.StatusInternalServerError, 50001, "QUERY_FAILED", nil)
+			return
+		}
+		if u == nil {
+			envelope.Err(w, r, http.StatusNotFound, 40401, "USER_NOT_FOUND", nil)
+			return
+		}
+		keys, err := st.AdminListAPIKeysForUser(r.Context(), uid)
+		if err != nil {
+			envelope.Err(w, r, http.StatusInternalServerError, 50002, "KEYS_QUERY_FAILED", nil)
+			return
+		}
+		wallet, err := st.AdminGetUserWallet(r.Context(), uid)
+		if err != nil {
+			envelope.Err(w, r, http.StatusInternalServerError, 50003, "WALLET_QUERY_FAILED", nil)
+			return
+		}
+		keyItems := make([]map[string]any, 0, len(keys))
+		for _, k := range keys {
+			row := map[string]any{
+				"id": k.ID, "scope": k.Scope, "name": k.Name, "key_prefix": k.KeyPrefix,
+				"status": k.Status, "created_at": k.CreatedAt.UTC().Format(time.RFC3339Nano),
+			}
+			if k.OrgID != nil {
+				row["org_id"] = *k.OrgID
+			}
+			if k.LastUsedAt.Valid {
+				row["last_used_at"] = k.LastUsedAt.Time.UTC().Format(time.RFC3339Nano)
+			}
+			keyItems = append(keyItems, row)
+		}
+		userOut := map[string]any{
+			"id": u.ID, "role": u.Role, "status": u.Status,
+			"created_at": u.CreatedAt.UTC().Format(time.RFC3339Nano),
+		}
+		if u.Email.Valid {
+			userOut["email"] = u.Email.String
+		}
+		if u.Phone.Valid {
+			userOut["phone"] = u.Phone.String
+		}
+		if u.DisplayName.Valid {
+			userOut["display_name"] = u.DisplayName.String
+		}
+		if u.AvatarURL.Valid {
+			userOut["avatar_url"] = u.AvatarURL.String
+		}
+		if u.LastLoginAt.Valid {
+			userOut["last_login_at"] = u.LastLoginAt.Time.UTC().Format(time.RFC3339Nano)
+		}
+		out := map[string]any{"user": userOut, "api_keys": keyItems}
+		if wallet != nil {
+			out["wallet"] = map[string]any{
+				"balance_cents": wallet.BalanceCents, "currency": wallet.Currency, "status": wallet.Status,
+			}
+		} else {
+			out["wallet"] = nil
+		}
+		out["note"] = "API Key 仅展示前缀；完整密钥仅在用户创建时返回一次，管理员无法查看明文。"
+		envelope.OK(w, r, out)
 	}
 }
 

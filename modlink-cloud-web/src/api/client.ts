@@ -25,6 +25,15 @@ export async function login(email: string, password: string) {
   return data
 }
 
+export async function register(email: string, password: string, displayName?: string) {
+  const { data } = await api.post<ApiEnvelope<Record<string, unknown>>>('/auth/register', {
+    email,
+    password,
+    display_name: displayName,
+  })
+  return data
+}
+
 export async function fetchWallet() {
   const { data } = await api.get<ApiEnvelope<{ balance_cents: number; currency: string }>>('/wallet')
   return data
@@ -51,6 +60,17 @@ export async function recharge(amountCents: number, channel = 'wechat') {
     { amount_cents: amountCents, channel },
   )
   return data
+}
+
+/** 调用平台注销并清除本地 access / refresh（服务端会撤销 refresh token） */
+export async function logoutAndClearLocal() {
+  try {
+    await api.post<ApiEnvelope<Record<string, unknown>>>('/auth/logout', {})
+  } catch {
+    /* 仍清除本地，避免卡在已登出状态 */
+  }
+  localStorage.removeItem('mlk_access_token')
+  localStorage.removeItem('mlk_refresh_token')
 }
 
 export default api

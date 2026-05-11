@@ -13,4 +13,13 @@ api.interceptors.request.use((config) => {
 
 export type ApiEnvelope<T> = { code: number; message: string; data?: T }
 
+export async function logoutAdmin() {
+  try {
+    await api.post<ApiEnvelope<Record<string, unknown>>>('/auth/logout', {})
+  } catch {
+    /* 仍清除本地 */
+  }
+  localStorage.removeItem('mlk_admin_token')
+}
+
 export default api
