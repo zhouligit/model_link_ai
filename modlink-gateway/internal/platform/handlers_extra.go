@@ -2,8 +2,10 @@ package platform
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/modlinkcloud/modlink-gateway/internal/config"
@@ -480,5 +482,47 @@ func adminModels(st *store.Store) http.HandlerFunc {
 			items = append(items, map[string]any{"id": id, "model_id": mid, "display_name": dn, "enabled": en == 1})
 		}
 		envelope.OK(w, r, map[string]any{"items": items})
+	}
+}
+
+func adminCreateModel(st *store.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			ModelID           string `json:"model_id"`
+			DisplayName       string `json:"display_name"`
+			UpstreamModelID   string `json:"upstream_model_id"`
+			ChannelID         uint64 `json:"channel_id"`
+			InputPer1kCents   int64  `json:"input_per_1k_cents"`
+			OutputPer1kCents  int64  `json:"output_per_1k_cents"`
+			Enabled           *bool  `json:"enabled"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			envelope.Err(w, r, http.StatusBadRequest, 40001, "BAD_JSON", nil)
+			return
+		}
+		body.ModelID = strings.TrimSpace(body.ModelID)
+		if body.ModelID == "" {
+			envelope.Err(w, r, http.StatusBadRequest, 40002, "MODEL_ID_REQUIRED", nil)
+			return
+		}
+		enabled := true
+		if body.Enabled != nil {
+			enabled = *body.Enabled
+		}
+		err := st.CreatePlatformModelBundle(r.Context(), body.ModelID, strings.TrimSpace(body.DisplayName), strings.TrimSpace(body.UpstreamModelID), body.ChannelID, body.InputPer1kCents, body.OutputPer1kCents, enabled)
+		if err != nil {
+			switch {
+			case errors.Is(err, store.ErrDuplicateModel):
+				envelope.Err(w, r, http.StatusConflict, 40901, "DUPLICATE_MODEL", nil)
+			case errors.Is(err, store.ErrChannelNotFound):
+				envelope.Err(w, r, http.StatusBadRequest, 40003, "CHANNEL_NOT_FOUND", nil)
+			case strings.Contains(err.Error(), "model_id required"), strings.Contains(err.Error(), "pricing must be non-negative"):
+				envelope.Err(w, r, http.StatusBadRequest, 40002, "INVALID_PARAMS", map[string]any{"error": err.Error()})
+			default:
+				envelope.Err(w, r, http.StatusInternalServerError, 50001, "CREATE_MODEL_FAILED", map[string]any{"error": err.Error()})
+			}
+			return
+		}
+		envelope.OK(w, r, map[string]any{"ok": true, "model_id": body.ModelID})
 	}
 }
