@@ -153,6 +153,7 @@ func NewRouter(cfg *config.Config, st *store.Store) http.Handler {
 				envelope.Err(w, r, http.StatusBadRequest, 40001, "BAD_JSON", nil)
 				return
 			}
+			body.Email = strings.TrimSpace(strings.ToLower(body.Email))
 			u, err := st.GetUserByEmail(r.Context(), body.Email)
 			if err != nil || u == nil || !auth.CheckPassword(u.PasswordHash, body.Password) {
 				envelope.Err(w, r, http.StatusUnauthorized, 40103, "BAD_CREDENTIALS", nil)

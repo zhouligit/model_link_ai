@@ -19,9 +19,8 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import axios from 'axios'
 import { ElMessage } from 'element-plus'
-import type { ApiEnvelope } from '../api/client'
+import api, { type ApiEnvelope } from '../api/client'
 
 const router = useRouter()
 const email = ref('')
@@ -31,17 +30,42 @@ const loading = ref(false)
 async function onSubmit() {
   loading.value = true
   try {
-    const { data } = await axios.post<ApiEnvelope<Record<string, unknown>>>('/mlk/platform/v1/auth/login', {
-      email: email.value,
+    const { data } = await api.post<ApiEnvelope<Record<string, unknown>>>('/auth/login', {
+      email: email.value.trim().toLowerCase(),
       password: password.value,
     })
+    if (!data || typeof data !== 'object' || typeof data.code !== 'number') {
+      ElMessage.error(
+        '服务返回异常：请确认开发代理 VITE_PROXY_TARGET 指向 Platform（:8081），不要指向 Gateway（:8080）',
+      )
+      return
+    }
     if (data.code !== 0 || !data.data) {
       ElMessage.error(data.message || '登录失败')
       return
     }
-    const d = data.data as { access_token?: string; role?: string }
-    if (d.access_token) localStorage.setItem('mlk_admin_token', d.access_token)
+    const d = data.data as { access_token?: string }
+    if (!d.access_token) {
+      ElMessage.error('未返回 access_token')
+      return
+    }
+    localStorage.setItem('mlk_admin_token', d.access_token)
+    const me = await api.get<ApiEnvelope<{ role?: string }>>('/auth/me')
+    if (!me.data || typeof me.data.code !== 'number' || me.data.code !== 0 || !me.data.data) {
+      localStorage.removeItem('mlk_admin_token')
+      ElMessage.error(me.data?.message || '无法验证身份')
+      return
+    }
+    const role = String(me.data.data.role || '').toLowerCase()
+    if (role !== 'admin') {
+      localStorage.removeItem('mlk_admin_token')
+      ElMessage.error('该账号不是管理员：请使用配置中 bootstrap_admin_emails 内的邮箱注册')
+      return
+    }
     router.push('/admin')
+  } catch (e: unknown) {
+    const ax = e as { response?: { data?: { message?: string } }; message?: string }
+    ElMessage.error(ax.response?.data?.message || ax.message || '请求失败（检查网络与代理）')
   } finally {
     loading.value = false
   }
