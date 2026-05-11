@@ -62,6 +62,30 @@ func (s *Store) ListUserOrgs(ctx context.Context, userID uint64) ([]Org, error) 
 	return out, rows.Err()
 }
 
+// ListAllOrgs returns all org rows (admin / ops); limit capped for safety.
+func (s *Store) ListAllOrgs(ctx context.Context, limit int) ([]Org, error) {
+	if limit <= 0 || limit > 500 {
+		limit = 200
+	}
+	rows, err := s.DB.QueryContext(ctx,
+		`SELECT id, name, slug, owner_user_id, status FROM orgs ORDER BY id DESC LIMIT ?`,
+		limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Org
+	for rows.Next() {
+		var o Org
+		if err := rows.Scan(&o.ID, &o.Name, &o.Slug, &o.OwnerUserID, &o.Status); err != nil {
+			return nil, err
+		}
+		out = append(out, o)
+	}
+	return out, rows.Err()
+}
+
 func (s *Store) GetOrg(ctx context.Context, orgID uint64) (*Org, error) {
 	var o Org
 	err := s.DB.QueryRowContext(ctx,

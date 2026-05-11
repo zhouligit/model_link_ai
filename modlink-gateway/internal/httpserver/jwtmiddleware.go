@@ -32,7 +32,7 @@ func BearerJWT(cfg *config.Config) func(http.Handler) http.Handler {
 func RequireAdmin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cl, ok := ClaimsFrom(r.Context())
-		if !ok || cl.Role != "admin" {
+		if !ok || !strings.EqualFold(strings.TrimSpace(cl.Role), "admin") {
 			envelope.Err(w, r, http.StatusForbidden, 40301, "FORBIDDEN", nil)
 			return
 		}

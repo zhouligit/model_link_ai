@@ -15,6 +15,19 @@ import (
 	"github.com/modlinkcloud/modlink-gateway/internal/store"
 )
 
+// canAccessOrg: 普通用户需为组织成员；管理员视为拥有全部「用户侧」组织权限（查看/切组织/钱包/用量等）。
+func canAccessOrg(st *store.Store, r *http.Request, orgID uint64) bool {
+	cl, ok := httpserver.ClaimsFrom(r.Context())
+	if !ok {
+		return false
+	}
+	if strings.EqualFold(strings.TrimSpace(cl.Role), "admin") {
+		return true
+	}
+	_, mem, err := st.IsOrgMember(r.Context(), orgID, cl.UserID)
+	return err == nil && mem
+}
+
 func listOrgs(st *store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cl, ok := httpserver.ClaimsFrom(r.Context())
@@ -22,7 +35,13 @@ func listOrgs(st *store.Store) http.HandlerFunc {
 			envelope.Err(w, r, http.StatusUnauthorized, 40101, "UNAUTHORIZED", nil)
 			return
 		}
-		orgs, err := st.ListUserOrgs(r.Context(), cl.UserID)
+		var orgs []store.Org
+		var err error
+		if strings.EqualFold(strings.TrimSpace(cl.Role), "admin") {
+			orgs, err = st.ListAllOrgs(r.Context(), 200)
+		} else {
+			orgs, err = st.ListUserOrgs(r.Context(), cl.UserID)
+		}
 		if err != nil {
 			envelope.Err(w, r, http.StatusInternalServerError, 50001, "LIST_FAILED", nil)
 			return
@@ -69,7 +88,7 @@ func createOrg(st *store.Store) http.HandlerFunc {
 
 func getOrg(st *store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		cl, ok := httpserver.ClaimsFrom(r.Context())
+		_, ok := httpserver.ClaimsFrom(r.Context())
 		if !ok {
 			envelope.Err(w, r, http.StatusUnauthorized, 40101, "UNAUTHORIZED", nil)
 			return
@@ -79,7 +98,7 @@ func getOrg(st *store.Store) http.HandlerFunc {
 			envelope.Err(w, r, http.StatusBadRequest, 40001, "BAD_ORG_ID", nil)
 			return
 		}
-		if _, ok2, _ := st.IsOrgMember(r.Context(), oid, cl.UserID); !ok2 {
+		if !canAccessOrg(st, r, oid) {
 			envelope.Err(w, r, http.StatusForbidden, 40301, "NOT_MEMBER", nil)
 			return
 		}
@@ -108,7 +127,7 @@ func switchOrg(cfg *config.Config, st *store.Store) http.HandlerFunc {
 			envelope.Err(w, r, http.StatusBadRequest, 40001, "BAD_ORG_ID", nil)
 			return
 		}
-		if _, ok2, _ := st.IsOrgMember(r.Context(), oid, cl.UserID); !ok2 {
+		if !canAccessOrg(st, r, oid) {
 			envelope.Err(w, r, http.StatusForbidden, 40301, "NOT_MEMBER", nil)
 			return
 		}
@@ -171,7 +190,7 @@ func createKey(st *store.Store) http.HandlerFunc {
 				envelope.Err(w, r, http.StatusBadRequest, 40002, "ORG_ID_REQUIRED", nil)
 				return
 			}
-			if _, okm, _ := st.IsOrgMember(r.Context(), *body.OrgID, cl.UserID); !okm {
+			if !canAccessOrg(st, r, *body.OrgID) {
 				envelope.Err(w, r, http.StatusForbidden, 40301, "NOT_MEMBER", nil)
 				return
 			}
@@ -223,7 +242,7 @@ func walletBalance(st *store.Store) http.HandlerFunc {
 		var err error
 		if qOrg != "" {
 			oid, _ := strconv.ParseUint(qOrg, 10, 64)
-			if _, ok2, _ := st.IsOrgMember(r.Context(), oid, cl.UserID); !ok2 {
+			if !canAccessOrg(st, r, oid) {
 				envelope.Err(w, r, http.StatusForbidden, 40301, "NOT_MEMBER", nil)
 				return
 			}
@@ -265,7 +284,7 @@ func recharge(cfg *config.Config, st *store.Store) http.HandlerFunc {
 		}
 		var oid *uint64
 		if body.OrgID != nil {
-			if _, ok2, _ := st.IsOrgMember(r.Context(), *body.OrgID, cl.UserID); !ok2 {
+			if !canAccessOrg(st, r, *body.OrgID) {
 				envelope.Err(w, r, http.StatusForbidden, 40301, "NOT_MEMBER", nil)
 				return
 			}
@@ -400,7 +419,7 @@ func usageSummary(st *store.Store) http.HandlerFunc {
 		var err error
 		if qOrg != "" {
 			oid, _ := strconv.ParseUint(qOrg, 10, 64)
-			if _, ok2, _ := st.IsOrgMember(r.Context(), oid, cl.UserID); !ok2 {
+			if !canAccessOrg(st, r, oid) {
 				envelope.Err(w, r, http.StatusForbidden, 40301, "NOT_MEMBER", nil)
 				return
 			}
